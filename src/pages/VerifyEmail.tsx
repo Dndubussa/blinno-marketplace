@@ -118,7 +118,26 @@ export default function VerifyEmail() {
       return;
     }
     
-    const { error } = await supabase.auth.resend({
+    // Check if user is already verified before resending
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.email_confirmed_at) {
+      toast({
+        title: "Already Verified",
+        description: "Your email is already verified. Redirecting...",
+      });
+      setIsResending(false);
+      // Redirect based on role
+      setTimeout(() => {
+        if (role === "seller") {
+          navigate("/onboarding", { state: { role } });
+        } else {
+          navigate("/buyer");
+        }
+      }, 2000);
+      return;
+    }
+    
+    const { error, data } = await supabase.auth.resend({
       type: "signup",
       email: emailToUse,
       options: {
@@ -127,16 +146,35 @@ export default function VerifyEmail() {
     });
 
     if (error) {
+      console.error("Resend error:", error);
+      
+      // Handle specific error cases
+      let errorMessage = error.message;
+      if (error.message.includes('already verified') || error.message.includes('already confirmed')) {
+        errorMessage = "Your email is already verified. Redirecting...";
+        setTimeout(() => {
+          if (role === "seller") {
+            navigate("/onboarding", { state: { role } });
+          } else {
+            navigate("/buyer");
+          }
+        }, 2000);
+      } else if (error.message.includes('rate limit') || error.message.includes('too many')) {
+        errorMessage = "Please wait a moment before requesting another email.";
+      } else if (error.message.includes('email') || error.message.includes('535')) {
+        errorMessage = "Failed to send email. Please check your email configuration or try again later.";
+      }
+      
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } else {
       setCountdown(60);
       toast({
         title: "Email sent",
-        description: "A new verification link has been sent to your email.",
+        description: "A new verification link has been sent to your email. Please check your inbox and spam folder.",
       });
     }
     setIsResending(false);

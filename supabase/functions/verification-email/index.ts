@@ -111,6 +111,7 @@ const handler = async (req: Request): Promise<Response> => {
         to: [email],
         subject: "Verify your Blinno account",
         html: emailHtml,
+        click_tracking: false, // Disable click tracking to prevent redirect chain issues
       }),
     });
 
