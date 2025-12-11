@@ -54,16 +54,39 @@ export default function VerifyEmail() {
     const checkVerificationStatus = async () => {
       // If verified=true in URL, user just clicked email link
       if (isVerifiedFromUrl) {
+        // Wait a bit for Supabase to process the hash tokens
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setIsVerified(true);
           if (!userEmail && session.user.email) {
             setUserEmail(session.user.email);
           }
+          
+          // Clean URL (remove hash and query params after processing)
+          window.history.replaceState({}, '', '/verify-email');
+          
           toast({
             title: "Email verified!",
             description: "Your email has been successfully verified. Redirecting you now...",
           });
+        } else {
+          // If no session yet, wait a bit more and retry
+          setTimeout(async () => {
+            const { data: { session: retrySession } } = await supabase.auth.getSession();
+            if (retrySession?.user) {
+              setIsVerified(true);
+              if (!userEmail && retrySession.user.email) {
+                setUserEmail(retrySession.user.email);
+              }
+              window.history.replaceState({}, '', '/verify-email');
+              toast({
+                title: "Email verified!",
+                description: "Your email has been successfully verified. Redirecting you now...",
+              });
+            }
+          }, 1000);
         }
       }
     };
@@ -92,6 +115,12 @@ export default function VerifyEmail() {
           if (!userEmail && session.user?.email) {
             setUserEmail(session.user.email);
           }
+          
+          // Clean URL (remove hash after processing)
+          if (window.location.hash) {
+            window.history.replaceState({}, '', '/verify-email?verified=true');
+          }
+          
           toast({
             title: "Email verified!",
             description: "Your email has been successfully verified. Redirecting you now...",
