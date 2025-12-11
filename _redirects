@@ -1,0 +1,5 @@
+# Cloudflare Pages redirects (also works for other platforms)
+# This file should be in the root directory for Cloudflare Pages
+
+/*    /index.html   200
+

@@ -1,3 +1,4 @@
 # Netlify redirects - SPA fallback
-/*    /index.html   200
+# This file should be in the public directory and will be copied to dist during build
 
+/*    /index.html   200
