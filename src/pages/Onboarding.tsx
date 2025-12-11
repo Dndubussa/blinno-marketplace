@@ -204,6 +204,32 @@ export default function Onboarding() {
 
   const totalSteps = data.role === "seller" ? 4 : 3;
 
+  // Check for OAuth errors in URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const error = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
+    
+    if (error) {
+      let errorMessage = "Authentication failed. Please try again.";
+      
+      if (error === "server_error" && errorDescription?.includes("Unable to exchange external code")) {
+        errorMessage = "OAuth authentication failed. The redirect URL may not be configured correctly. Please contact support or try signing in with email and password.";
+      } else if (errorDescription) {
+        errorMessage = decodeURIComponent(errorDescription);
+      }
+      
+      toast({
+        title: "Authentication Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      
+      // Clean up URL
+      navigate("/onboarding", { replace: true });
+    }
+  }, [location.search, navigate, toast]);
+
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
