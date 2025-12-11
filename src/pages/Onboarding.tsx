@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -179,13 +179,18 @@ const percentagePlans = [
 export default function Onboarding() {
   const { user, loading, becomeSeller } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [pricingModel, setPricingModel] = useState<PricingModel>("subscription");
+  
+  // Get role from location state (if coming from email verification or direct navigation)
+  const roleFromState = location.state?.role as Role | undefined;
+  
   const [data, setData] = useState<OnboardingData>({
-    role: null,
+    role: roleFromState || null,
     interests: [],
     businessName: "",
     businessDescription: "",
@@ -204,6 +209,14 @@ export default function Onboarding() {
       navigate("/auth");
     }
   }, [user, loading, navigate]);
+
+  // If role is provided from state (e.g., from email verification), skip role selection
+  useEffect(() => {
+    if (roleFromState && data.role === roleFromState && step === 1) {
+      // Automatically advance to step 2 if role is already set
+      setStep(2);
+    }
+  }, [roleFromState, data.role, step]);
 
   const handleRoleSelect = (role: Role) => {
     setData({ ...data, role });

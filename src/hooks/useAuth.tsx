@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, intendedRole?: "buyer" | "seller") => {
     const redirectUrl = `${window.location.origin}/verify-email?verified=true`;
 
     const { error } = await supabase.auth.signUp({
@@ -147,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
+          intended_role: intendedRole || "buyer", // Store intended role in metadata
         },
       },
     });

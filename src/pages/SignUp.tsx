@@ -82,7 +82,7 @@ export default function SignUp() {
 
   const handleSignUp = async (data: SignUpFormData) => {
     setIsLoading(true);
-    const { error } = await signUp(data.email, data.password, data.fullName);
+    const { error } = await signUp(data.email, data.password, data.fullName, data.role);
 
     if (error) {
       let message = error.message;

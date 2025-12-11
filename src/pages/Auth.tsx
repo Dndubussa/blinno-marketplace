@@ -121,6 +121,7 @@ export default function Auth() {
         emailRedirectTo: `${window.location.origin}/verify-email?verified=true`,
         data: {
           full_name: data.fullName,
+          intended_role: data.role || "buyer", // Store intended role in metadata
         },
       },
     });

@@ -160,10 +160,11 @@ export default function VerifyEmail() {
       return;
     }
 
-    // Get user role from state or database
+    // Get user role from state, database, or user metadata
     let userRole = role;
     
     if (!userRole) {
+      // First, try to get role from database
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
@@ -183,11 +184,17 @@ export default function VerifyEmail() {
           userRole = roles[0].role;
         }
       }
+      
+      // If no role found in database, check user metadata (for new signups)
+      if (!userRole && session.user.user_metadata?.intended_role) {
+        userRole = session.user.user_metadata.intended_role;
+      }
     }
     
     // Redirect based on role (consistent across all entry points)
     if (userRole === "seller") {
-      navigate("/seller");
+      // New sellers should go to onboarding first, not directly to dashboard
+      navigate("/onboarding", { state: { role: "seller" } });
     } else if (userRole === "buyer") {
       navigate("/buyer");
     } else {
