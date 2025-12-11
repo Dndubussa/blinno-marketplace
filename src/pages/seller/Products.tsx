@@ -48,12 +48,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import CategoryFields from "@/components/seller/CategoryFields";
 import ImageGalleryUpload from "@/components/seller/ImageGalleryUpload";
+import { SUPPORTED_CURRENCIES, Currency, CURRENCY_INFO } from "@/lib/currency";
 
 interface Product {
   id: string;
   title: string;
   description: string | null;
   price: number;
+  currency?: string;
   category: string;
   stock_quantity: number;
   is_active: boolean;
@@ -89,6 +91,7 @@ export default function Products() {
     title: "",
     description: "",
     price: "",
+    currency: "USD" as Currency,
     category: "",
     stock_quantity: "",
   });
@@ -131,11 +134,13 @@ export default function Products() {
       title: formData.title,
       description: formData.description || null,
       price: parseFloat(formData.price),
+      currency: formData.currency,
       category: formData.category,
       stock_quantity: parseInt(formData.stock_quantity) || 0,
       seller_id: user.id,
       attributes: attributes,
       images: productImages,
+      is_active: true, // Explicitly set to active so products are immediately visible
     };
 
     let error;
@@ -170,6 +175,7 @@ export default function Products() {
         title: "",
         description: "",
         price: "",
+        currency: "USD" as Currency,
         category: "",
         stock_quantity: "",
       });
@@ -185,6 +191,7 @@ export default function Products() {
       title: product.title,
       description: product.description || "",
       price: product.price.toString(),
+      currency: (product.currency || "USD") as Currency,
       category: product.category,
       stock_quantity: product.stock_quantity.toString(),
     });
@@ -253,6 +260,7 @@ export default function Products() {
                   title: "",
                   description: "",
                   price: "",
+                  currency: "USD" as Currency,
                   category: "",
                   stock_quantity: "",
                 });
@@ -322,7 +330,7 @@ export default function Products() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="price">Price ($)</Label>
+                    <Label htmlFor="price">Price</Label>
                     <Input
                       id="price"
                       type="number"
@@ -335,6 +343,26 @@ export default function Products() {
                       placeholder="0.00"
                       required
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select
+                      value={formData.currency}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, currency: value as Currency })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CURRENCIES.map((currency) => (
+                          <SelectItem key={currency} value={currency}>
+                            {currency} - {CURRENCY_INFO[currency].name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">

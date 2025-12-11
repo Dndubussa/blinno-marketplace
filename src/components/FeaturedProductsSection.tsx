@@ -177,10 +177,17 @@ export const FeaturedProductsSection = () => {
                         src={product.images[0]}
                         alt={product.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder.svg";
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        No image
+                        <img
+                          src="/placeholder.svg"
+                          alt="No image"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     )}
                     <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground">

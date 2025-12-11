@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Save, User, Store, Bell, Shield } from "lucide-react";
+import { Save, User, Store, Bell, Shield, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +11,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrency } from "@/hooks/useCurrency";
+import { SUPPORTED_CURRENCIES, CURRENCY_INFO, Currency } from "@/lib/currency";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export default function Settings() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const { userCurrency, setUserCurrency } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || "",
@@ -136,6 +147,28 @@ export default function Settings() {
                       placeholder="Tell customers about yourself..."
                       rows={4}
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Preferred Currency</Label>
+                    <Select
+                      value={userCurrency}
+                      onValueChange={(value) => setUserCurrency(value as Currency)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CURRENCIES.map((currency) => (
+                          <SelectItem key={currency} value={currency}>
+                            {currency} - {CURRENCY_INFO[currency].name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Choose your preferred currency for viewing prices. This also sets the default currency for new products.
+                    </p>
                   </div>
 
                   <Button type="submit" variant="hero" disabled={loading}>

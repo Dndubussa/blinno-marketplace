@@ -6,11 +6,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrency } from "@/hooks/useCurrency";
+import { Currency } from "@/lib/currency";
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  currency?: string;
   category: string;
   images: string[] | null;
 }
@@ -56,7 +59,7 @@ export function SearchAutocomplete() {
       
       const { data, error } = await supabase
         .from("products")
-        .select("id, title, price, category, images")
+        .select("id, title, price, currency, category, images")
         .eq("is_active", true)
         .or(`title.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
         .limit(5);
@@ -100,12 +103,7 @@ export function SearchAutocomplete() {
     handleSearch(query);
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(price);
-  };
+  const { formatPrice } = useCurrency();
 
   const trendingSearches = ["Electronics", "Fashion", "Books", "Home Decor"];
 
@@ -163,7 +161,7 @@ export function SearchAutocomplete() {
                     <div className="flex-1 min-w-0">
                       <p className="truncate font-medium">{product.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatPrice(product.price)} · {product.category}
+                        {formatPrice(product.price, (product.currency || 'USD') as Currency)} · {product.category}
                       </p>
                     </div>
                   </button>

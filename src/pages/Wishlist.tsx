@@ -8,13 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useCart } from "@/hooks/useCart";
-
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
+import { useCurrency } from "@/hooks/useCurrency";
+import { Currency } from "@/lib/currency";
 
 const getCategoryColor = (category: string) => {
   const colors: Record<string, string> = {
@@ -31,6 +26,7 @@ const getCategoryColor = (category: string) => {
 export default function Wishlist() {
   const { items, removeFromWishlist, clearWishlist } = useWishlist();
   const { addToCart } = useCart();
+  const { formatPrice } = useCurrency();
 
   const handleAddToCart = (item: typeof items[0]) => {
     addToCart({
@@ -132,7 +128,7 @@ export default function Wishlist() {
                       </Link>
                       <div className="mt-3 flex items-center justify-between">
                         <span className="text-lg font-bold text-primary">
-                          {formatPrice(item.price)}
+                          {formatPrice(item.price, 'USD')}
                         </span>
                         <Button
                           size="sm"

@@ -221,22 +221,36 @@ serve(async (req) => {
         if (itemsError) {
           console.error("Error fetching order items:", itemsError);
         } else if (orderItems && orderItems.length > 0) {
-          const platformFeeRate = 0.05;
-          const earningsToInsert = orderItems.map(item => {
-            const amount = item.price_at_purchase * item.quantity;
-            const platformFee = Math.round(amount * platformFeeRate * 100) / 100;
-            const netAmount = amount - platformFee;
-            
-            return {
-              seller_id: item.seller_id,
-              order_item_id: item.id,
-              order_id: existingTx.order_id,
-              amount,
-              platform_fee: platformFee,
-              net_amount: netAmount,
-              status: 'completed'
-            };
-          });
+          // Calculate earnings with plan-based commission rates
+          const earningsToInsert = await Promise.all(
+            orderItems.map(async (item) => {
+              // Get commission rate for this seller's plan
+              const { data: commissionRate, error: commissionError } = await supabase
+                .rpc('get_seller_commission_rate', { p_seller_id: item.seller_id });
+
+              if (commissionError) {
+                console.error(`Error getting commission rate for seller ${item.seller_id}:`, commissionError);
+              }
+
+              // Use plan-based rate or default to 5% if error
+              // RPC function returns a single numeric value directly
+              const platformFeeRate = (typeof commissionRate === 'number' ? commissionRate : 0.05);
+              
+              const amount = item.price_at_purchase * item.quantity;
+              const platformFee = Math.round(amount * platformFeeRate * 100) / 100;
+              const netAmount = amount - platformFee;
+              
+              return {
+                seller_id: item.seller_id,
+                order_item_id: item.id,
+                order_id: existingTx.order_id,
+                amount,
+                platform_fee: platformFee,
+                net_amount: netAmount,
+                status: 'completed'
+              };
+            })
+          );
 
           const { error: earningsError } = await supabase
             .from("seller_earnings")
@@ -245,7 +259,7 @@ serve(async (req) => {
           if (earningsError) {
             console.error("Error creating seller earnings:", earningsError);
           } else {
-            console.log(`Created earnings for ${earningsToInsert.length} seller(s)`);
+            console.log(`Created earnings for ${earningsToInsert.length} seller(s) with plan-based commission rates`);
           }
         }
       }

@@ -24,13 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Json } from "@/integrations/supabase/types";
-
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface ShippingAddress {
   fullName: string;
@@ -73,6 +67,7 @@ const statusOrder = ["pending", "confirmed", "processing", "shipped", "out_for_d
 export default function OrderTracking() {
   const { orderId } = useParams<{ orderId: string }>();
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["order", orderId],

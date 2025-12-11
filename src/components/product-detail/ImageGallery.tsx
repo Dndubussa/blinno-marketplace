@@ -11,7 +11,19 @@ interface ImageGalleryProps {
 
 export function ImageGallery({ images, title }: ImageGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const displayImages = images.length > 0 ? images : ["/placeholder.svg"];
+
+  const handleImageError = (index: number) => {
+    setImageErrors((prev) => new Set(prev).add(index));
+  };
+
+  const getImageSrc = (index: number) => {
+    if (imageErrors.has(index) || !displayImages[index]) {
+      return "/placeholder.svg";
+    }
+    return displayImages[index];
+  };
 
   const goToPrevious = () => {
     setSelectedIndex((prev) => (prev === 0 ? displayImages.length - 1 : prev - 1));
@@ -28,13 +40,14 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
         <AnimatePresence mode="wait">
           <motion.img
             key={selectedIndex}
-            src={displayImages[selectedIndex]}
+            src={getImageSrc(selectedIndex)}
             alt={`${title} - Image ${selectedIndex + 1}`}
             className="h-full w-full object-cover"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
+            onError={() => handleImageError(selectedIndex)}
           />
         </AnimatePresence>
 
@@ -83,9 +96,10 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
               )}
             >
               <img
-                src={image}
+                src={getImageSrc(index)}
                 alt={`${title} thumbnail ${index + 1}`}
                 className="h-full w-full object-cover"
+                onError={() => handleImageError(index)}
               />
             </button>
           ))}

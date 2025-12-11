@@ -59,13 +59,10 @@ const mobileNetworks: { id: MobileNetwork; name: string; color: string }[] = [
   { id: "HALOPESA", name: "Halopesa", color: "bg-orange-500" },
 ];
 
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
+import { useCurrency } from "@/hooks/useCurrency";
+import { convertCurrency, formatPrice as formatPriceUtil, Currency } from "@/lib/currency";
 
+// Keep formatPriceTZS for payment processing (ClickPesa requires TZS)
 const formatPriceTZS = (price: number) => {
   // Convert USD to TZS (approximate rate)
   const tzsAmount = price * 2500;
@@ -81,6 +78,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { items, totalPrice, clearCart } = useCart();
   const { user } = useAuth();
+  const { formatPrice, userCurrency } = useCurrency();
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);

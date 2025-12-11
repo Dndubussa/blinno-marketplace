@@ -69,7 +69,7 @@ export default function ImageGalleryUpload({
         const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
-          .from("product-files")
+          .from("product-images")
           .upload(fileName, file);
 
         if (uploadError) {
@@ -83,7 +83,7 @@ export default function ImageGalleryUpload({
         }
 
         const { data: urlData } = supabase.storage
-          .from("product-files")
+          .from("product-images")
           .getPublicUrl(fileName);
 
         if (urlData?.publicUrl) {
@@ -120,9 +120,14 @@ export default function ImageGalleryUpload({
 
     // Try to delete from storage
     try {
-      const path = imageUrl.split("/product-files/")[1];
+      // Check if it's from product-images or product-files bucket
+      const productImagesMatch = imageUrl.split("/product-images/")[1];
+      const productFilesMatch = imageUrl.split("/product-files/")[1];
+      const path = productImagesMatch || productFilesMatch;
+      
       if (path) {
-        await supabase.storage.from("product-files").remove([path]);
+        const bucket = productImagesMatch ? "product-images" : "product-files";
+        await supabase.storage.from(bucket).remove([path]);
       }
     } catch (error) {
       console.error("Error deleting image:", error);

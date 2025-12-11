@@ -9,12 +9,15 @@ import { useCart } from "@/hooks/useCart";
 import { useWishlist } from "@/hooks/useWishlist";
 import { usePurchasedProducts } from "@/hooks/usePurchasedProducts";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrency } from "@/hooks/useCurrency";
+import { Currency } from "@/lib/currency";
 
 interface Product {
   id: string;
   title: string;
   description: string | null;
   price: number;
+  currency?: string;
   category: string;
   subcategory: string | null;
   stock_quantity: number;
@@ -31,13 +34,6 @@ interface ProductInfoProps {
 const DIGITAL_CATEGORIES = ["Books", "Music", "Courses"];
 
 const isDigitalProduct = (category: string) => DIGITAL_CATEGORIES.includes(category);
-
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
 
 const getCategoryColor = (category: string) => {
   const colors: Record<string, string> = {
@@ -57,6 +53,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { hasPurchased } = usePurchasedProducts();
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
   
   const isOutOfStock = product.stock_quantity === 0;
   const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 5;
@@ -133,7 +130,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
       {/* Price */}
       <div className="mt-4 flex items-baseline gap-2">
         <span className="text-3xl font-bold text-primary">
-          {formatPrice(product.price)}
+          {formatPrice(product.price, (product.currency || 'USD') as Currency)}
         </span>
       </div>
 

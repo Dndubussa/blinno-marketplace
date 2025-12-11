@@ -11,13 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useCart } from "@/hooks/useCart";
-
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
+import { useCurrency } from "@/hooks/useCurrency";
 
 export function CartDrawer() {
   const {
@@ -30,6 +24,7 @@ export function CartDrawer() {
     isCartOpen,
     setIsCartOpen,
   } = useCart();
+  const { formatPrice } = useCurrency();
 
   return (
     <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>

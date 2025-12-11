@@ -8,13 +8,23 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Bell, Shield, LogOut } from "lucide-react";
+import { User, Bell, Shield, LogOut, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useCurrency } from "@/hooks/useCurrency";
+import { SUPPORTED_CURRENCIES, CURRENCY_INFO, Currency } from "@/lib/currency";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function BuyerSettings() {
   const { user, profile, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { userCurrency, setUserCurrency } = useCurrency();
   const [isUpdating, setIsUpdating] = useState(false);
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || "",
@@ -114,6 +124,40 @@ export default function BuyerSettings() {
           <Button onClick={handleUpdateProfile} disabled={isUpdating}>
             {isUpdating ? "Saving..." : "Save Changes"}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Currency Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5" />
+            Currency Preferences
+          </CardTitle>
+          <CardDescription>Choose your preferred currency for viewing prices</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="currency">Preferred Currency</Label>
+            <Select
+              value={userCurrency}
+              onValueChange={(value) => setUserCurrency(value as Currency)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map((currency) => (
+                  <SelectItem key={currency} value={currency}>
+                    {currency} - {CURRENCY_INFO[currency].name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              All prices will be displayed in your preferred currency. Prices are automatically converted from the seller's currency.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

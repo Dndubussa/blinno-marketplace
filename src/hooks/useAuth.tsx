@@ -140,23 +140,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string, intendedRole?: "buyer" | "seller") => {
     const redirectUrl = `${window.location.origin}/verify-email?verified=true`;
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-          intended_role: intendedRole || "buyer", // Store intended role in metadata
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+            intended_role: intendedRole || "buyer", // Store intended role in metadata
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      return { error };
+      if (error) {
+        // Provide more helpful error messages
+        if (error.message.includes('email') || error.message.includes('confirmation') || error.message.includes('535')) {
+          console.error('Email confirmation error:', error);
+          return { 
+            error: new Error('Failed to send confirmation email. Please check your email configuration in Supabase Dashboard or contact support.') 
+          };
+        }
+        return { error };
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      return { error: err };
     }
-
-    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {

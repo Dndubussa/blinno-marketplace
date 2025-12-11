@@ -5,13 +5,16 @@ import { ShoppingCart, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/useCart";
+import { useCurrency } from "@/hooks/useCurrency";
 import type { ViewMode } from "@/pages/Products";
+import { Currency } from "@/lib/currency";
 
 interface Product {
   id: string;
   title: string;
   description: string | null;
   price: number;
+  currency?: string;
   category: string;
   images: string[] | null;
   stock_quantity: number;
@@ -22,13 +25,6 @@ interface ProductCardProps {
   product: Product;
   viewMode: ViewMode;
 }
-
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
 
 const getCategoryColor = (category: string) => {
   const colors: Record<string, string> = {
@@ -44,10 +40,23 @@ const getCategoryColor = (category: string) => {
 
 export function ProductCard({ product, viewMode }: ProductCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const images = product.images && product.images.length > 0 ? product.images : ["/placeholder.svg"];
   const isOutOfStock = product.stock_quantity === 0;
   const { addToCart } = useCart();
+  const { formatPrice } = useCurrency();
   const hasMultipleImages = images.length > 1;
+
+  const handleImageError = (index: number) => {
+    setImageErrors((prev) => new Set(prev).add(index));
+  };
+
+  const getImageSrc = (index: number) => {
+    if (imageErrors.has(index) || !images[index]) {
+      return "/placeholder.svg";
+    }
+    return images[index];
+  };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -85,9 +94,10 @@ export function ProductCard({ product, viewMode }: ProductCardProps) {
         <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-lg">
           <Link to={`/product/${product.id}`}>
             <img
-              src={images[currentImageIndex]}
+              src={getImageSrc(currentImageIndex)}
               alt={product.title}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={() => handleImageError(currentImageIndex)}
             />
           </Link>
           {isOutOfStock && (
@@ -145,7 +155,7 @@ export function ProductCard({ product, viewMode }: ProductCardProps) {
           </div>
           <div className="mt-3 flex items-center justify-between">
             <span className="text-lg font-bold text-primary">
-              {formatPrice(product.price)}
+              {formatPrice(product.price, (product.currency || 'USD') as Currency)}
             </span>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" asChild>
@@ -175,9 +185,10 @@ export function ProductCard({ product, viewMode }: ProductCardProps) {
         {/* Image with navigation */}
         <div className="relative aspect-square overflow-hidden">
           <img
-            src={images[currentImageIndex]}
+            src={getImageSrc(currentImageIndex)}
             alt={product.title}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => handleImageError(currentImageIndex)}
           />
           {isOutOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/80">
@@ -241,7 +252,7 @@ export function ProductCard({ product, viewMode }: ProductCardProps) {
           </Link>
           <div className="mt-4 flex items-center justify-between">
             <span className="text-lg font-bold text-primary">
-              {formatPrice(product.price)}
+              {formatPrice(product.price, (product.currency || 'USD') as Currency)}
             </span>
             <Button size="sm" disabled={isOutOfStock} onClick={handleAddToCart}>
               <ShoppingCart className="h-4 w-4" />

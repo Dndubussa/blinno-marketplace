@@ -8,13 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, ShoppingBag, Truck } from "lucide-react";
 import { format } from "date-fns";
-
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
+import { useCurrency } from "@/hooks/useCurrency";
 
 const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
@@ -29,6 +23,7 @@ const getStatusColor = (status: string) => {
 
 export function PurchaseHistory() {
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["user-orders", user?.id],

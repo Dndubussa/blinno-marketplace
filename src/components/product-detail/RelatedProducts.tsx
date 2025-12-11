@@ -1,11 +1,14 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
+import { useCurrency } from "@/hooks/useCurrency";
+import { Currency } from "@/lib/currency";
 
 interface Product {
   id: string;
   title: string;
   price: number;
+  currency?: string;
   images: string[] | null;
   category: string;
 }
@@ -14,14 +17,9 @@ interface RelatedProductsProps {
   products: Product[];
 }
 
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(price);
-};
-
 export function RelatedProducts({ products }: RelatedProductsProps) {
+  const { formatPrice } = useCurrency();
+  
   return (
     <section className="mt-16">
       <Separator className="mb-8" />
@@ -45,12 +43,15 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
                   src={product.images?.[0] || "/placeholder.svg"}
                   alt={product.title}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  onError={(e) => {
+                    e.currentTarget.src = "/placeholder.svg";
+                  }}
                 />
               </div>
               <div className="p-4">
                 <h3 className="font-semibold line-clamp-1">{product.title}</h3>
                 <p className="mt-1 text-lg font-bold text-primary">
-                  {formatPrice(product.price)}
+                  {formatPrice(product.price, (product.currency || 'USD') as Currency)}
                 </p>
               </div>
             </Link>
