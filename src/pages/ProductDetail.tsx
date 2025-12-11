@@ -105,7 +105,15 @@ export default function ProductDetail() {
 
           {/* Product Section */}
           <div className="grid gap-8 lg:grid-cols-2">
-            <ImageGallery images={product.images || []} title={product.title} />
+            <ImageGallery 
+              images={
+                // For Music category, include album cover art if available
+                product.category === "Music" && product.attributes?.albumCover
+                  ? [product.attributes.albumCover, ...(product.images || [])]
+                  : (product.images || [])
+              } 
+              title={product.title} 
+            />
             <ProductInfo product={product} />
           </div>
 

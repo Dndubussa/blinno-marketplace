@@ -38,32 +38,57 @@ export default function CategoryFields({ category, attributes, onChange, userId 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}/${Date.now()}.${fileExt}`;
-
-    const { data, error } = await supabase.storage
-      .from('product-files')
-      .upload(fileName, file);
-
-    if (error) {
+    // File size validation (100MB max for most files, 500MB for videos)
+    const maxSize = fieldName.includes('video') || fieldName === 'videoFile' ? 500 * 1024 * 1024 : 100 * 1024 * 1024;
+    if (file.size > maxSize) {
       toast({
-        title: "Upload failed",
-        description: error.message,
+        title: "File too large",
+        description: `File size must be less than ${maxSize / (1024 * 1024)}MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`,
         variant: "destructive",
       });
-    } else {
-      const { data: urlData } = supabase.storage
-        .from('product-files')
-        .getPublicUrl(fileName);
-      
-      updateAttribute(fieldName, urlData.publicUrl);
-      toast({
-        title: "File uploaded",
-        description: "Your file has been uploaded successfully.",
-      });
+      return;
     }
-    setUploading(false);
+
+    setUploading(true);
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const fileName = `${userId}/${Date.now()}.${fileExt}`;
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('product-files')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        toast({
+          title: "Upload failed",
+          description: error.message || "Failed to upload file. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        const { data: urlData } = supabase.storage
+          .from('product-files')
+          .getPublicUrl(fileName);
+        
+        updateAttribute(fieldName, urlData.publicUrl);
+        toast({
+          title: "File uploaded",
+          description: "Your file has been uploaded successfully.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Upload failed",
+        description: err.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      // Reset input
+      e.target.value = '';
+    }
   };
 
   const removeFile = (fieldName: string) => {
@@ -382,15 +407,16 @@ export default function CategoryFields({ category, attributes, onChange, userId 
         
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Artist/Band</Label>
+            <Label>Artist/Band *</Label>
             <Input
               value={attributes.artist || ""}
               onChange={(e) => updateAttribute("artist", e.target.value)}
               placeholder="Artist or band name"
+              required
             />
           </div>
           <div className="space-y-2">
-            <Label>Genre</Label>
+            <Label>Genre *</Label>
             <Select
               value={attributes.genre || ""}
               onValueChange={(v) => updateAttribute("genre", v)}
@@ -408,6 +434,15 @@ export default function CategoryFields({ category, attributes, onChange, userId 
                 <SelectItem value="electronic">Electronic</SelectItem>
                 <SelectItem value="afrobeats">Afrobeats</SelectItem>
                 <SelectItem value="bongo">Bongo Flava</SelectItem>
+                <SelectItem value="reggae">Reggae</SelectItem>
+                <SelectItem value="country">Country</SelectItem>
+                <SelectItem value="blues">Blues</SelectItem>
+                <SelectItem value="gospel">Gospel</SelectItem>
+                <SelectItem value="folk">Folk</SelectItem>
+                <SelectItem value="metal">Metal</SelectItem>
+                <SelectItem value="punk">Punk</SelectItem>
+                <SelectItem value="latin">Latin</SelectItem>
+                <SelectItem value="world">World Music</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -416,7 +451,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Type</Label>
+            <Label>Type *</Label>
             <Select
               value={attributes.musicType || ""}
               onValueChange={(v) => updateAttribute("musicType", v)}
@@ -429,6 +464,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
                 <SelectItem value="album">Album</SelectItem>
                 <SelectItem value="ep">EP</SelectItem>
                 <SelectItem value="beat">Beat/Instrumental</SelectItem>
+                <SelectItem value="mixtape">Mixtape</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -442,8 +478,68 @@ export default function CategoryFields({ category, attributes, onChange, userId 
           </div>
         </div>
 
+        {/* Song Titles/Track Listing for Albums */}
+        {(attributes.musicType === "album" || attributes.musicType === "ep" || attributes.musicType === "mixtape") && (
+          <div className="space-y-2">
+            <Label>Track Listing</Label>
+            <Textarea
+              value={attributes.trackListing || ""}
+              onChange={(e) => updateAttribute("trackListing", e.target.value)}
+              placeholder="Enter track titles, one per line:&#10;1. Song Title 1&#10;2. Song Title 2&#10;3. Song Title 3"
+              rows={4}
+            />
+            <p className="text-xs text-muted-foreground">List all songs/tracks in this release</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Release Date</Label>
+            <Input
+              type="date"
+              value={attributes.releaseDate || ""}
+              onChange={(e) => updateAttribute("releaseDate", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Record Label</Label>
+            <Input
+              value={attributes.recordLabel || ""}
+              onChange={(e) => updateAttribute("recordLabel", e.target.value)}
+              placeholder="Record label name (optional)"
+            />
+          </div>
+        </div>
+
+        {/* Album Cover Art Upload */}
         <div className="space-y-2">
-          <Label>Upload Audio File</Label>
+          <Label>Album Cover Art *</Label>
+          {attributes.albumCover ? (
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+              <img 
+                src={attributes.albumCover} 
+                alt="Album cover" 
+                className="h-20 w-20 object-cover rounded"
+              />
+              <span className="text-sm flex-1 truncate">Cover art uploaded</span>
+              <Button type="button" size="icon" variant="ghost" onClick={() => removeFile("albumCover")}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFileUpload(e, "albumCover")}
+              disabled={uploading}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">Upload high-quality album cover art (recommended: 1000x1000px)</p>
+        </div>
+
+        {/* Audio File Upload */}
+        <div className="space-y-2">
+          <Label>Upload Audio File *</Label>
           {attributes.audioFile ? (
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
               <FileAudio className="h-5 w-5 text-primary" />
@@ -455,15 +551,39 @@ export default function CategoryFields({ category, attributes, onChange, userId 
           ) : (
             <Input
               type="file"
-              accept=".mp3,.wav,.flac,.aac"
+              accept=".mp3,.wav,.flac,.aac,.m4a"
               onChange={(e) => handleFileUpload(e, "audioFile")}
               disabled={uploading}
             />
           )}
+          <p className="text-xs text-muted-foreground">Supported formats: MP3, WAV, FLAC, AAC, M4A</p>
         </div>
 
+        {/* Video File Upload (Music Video) */}
         <div className="space-y-2">
-          <Label>Preview Audio (optional)</Label>
+          <Label>Music Video (Optional)</Label>
+          {attributes.videoFile ? (
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+              <FileVideo className="h-5 w-5 text-primary" />
+              <span className="text-sm flex-1 truncate">Video uploaded</span>
+              <Button type="button" size="icon" variant="ghost" onClick={() => removeFile("videoFile")}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Input
+              type="file"
+              accept=".mp4,.webm,.mov,.avi"
+              onChange={(e) => handleFileUpload(e, "videoFile")}
+              disabled={uploading}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">Upload music video (formats: MP4, WebM, MOV, AVI)</p>
+        </div>
+
+        {/* Preview Audio */}
+        <div className="space-y-2">
+          <Label>Preview Audio (Optional)</Label>
           {attributes.previewFile ? (
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
               <FileAudio className="h-5 w-5 text-muted-foreground" />
@@ -480,7 +600,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
               disabled={uploading}
             />
           )}
-          <p className="text-xs text-muted-foreground">Short preview clip for potential buyers</p>
+          <p className="text-xs text-muted-foreground">Short preview clip (30-60 seconds) for potential buyers</p>
         </div>
       </div>
     );
@@ -814,6 +934,96 @@ export default function CategoryFields({ category, attributes, onChange, userId 
             placeholder="List key features, one per line..."
             rows={3}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // Other category fields - generic customizable attributes
+  if (category === "Other") {
+    return (
+      <div className="space-y-4 border-t pt-4">
+        <h4 className="font-medium text-sm text-muted-foreground">Additional Details</h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Brand/Manufacturer</Label>
+            <Input
+              value={attributes.brand || ""}
+              onChange={(e) => updateAttribute("brand", e.target.value)}
+              placeholder="Brand or manufacturer name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Model/Item Number</Label>
+            <Input
+              value={attributes.modelNumber || ""}
+              onChange={(e) => updateAttribute("modelNumber", e.target.value)}
+              placeholder="Model or item number"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Condition</Label>
+            <Select
+              value={attributes.condition || ""}
+              onValueChange={(v) => updateAttribute("condition", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select condition" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="like_new">Like New</SelectItem>
+                <SelectItem value="excellent">Excellent</SelectItem>
+                <SelectItem value="good">Good</SelectItem>
+                <SelectItem value="fair">Fair</SelectItem>
+                <SelectItem value="poor">Poor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Warranty</Label>
+            <Input
+              value={attributes.warranty || ""}
+              onChange={(e) => updateAttribute("warranty", e.target.value)}
+              placeholder="e.g., 1 year, 6 months"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Additional Specifications</Label>
+          <Textarea
+            value={attributes.specifications || ""}
+            onChange={(e) => updateAttribute("specifications", e.target.value)}
+            placeholder="Enter any additional specifications, features, or details..."
+            rows={4}
+          />
+        </div>
+
+        {/* Optional file upload for documentation/manuals */}
+        <div className="space-y-2">
+          <Label>Documentation/Manual (Optional)</Label>
+          {attributes.documentationFile ? (
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+              <FileText className="h-5 w-5 text-primary" />
+              <span className="text-sm flex-1 truncate">Document uploaded</span>
+              <Button type="button" size="icon" variant="ghost" onClick={() => removeFile("documentationFile")}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Input
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={(e) => handleFileUpload(e, "documentationFile")}
+              disabled={uploading}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">Upload product manual or documentation (PDF, DOC, DOCX)</p>
         </div>
       </div>
     );

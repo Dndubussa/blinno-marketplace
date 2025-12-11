@@ -162,6 +162,389 @@ export function ProductInfo({ product }: ProductInfoProps) {
 
       <Separator className="my-6" />
 
+      {/* Category-Specific Attributes */}
+      {Object.keys(attributes).length > 0 && (
+        <>
+          <div>
+            <h3 className="font-semibold mb-4">Product Details</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Music Attributes */}
+              {product.category === "Music" && (
+                <>
+                  {attributes.artist && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Artist/Band</span>
+                      <p className="mt-1 text-sm">{attributes.artist}</p>
+                    </div>
+                  )}
+                  {attributes.genre && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Genre</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.genre.replace(/([A-Z])/g, ' $1').trim()}</p>
+                    </div>
+                  )}
+                  {attributes.musicType && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Type</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.musicType}</p>
+                    </div>
+                  )}
+                  {attributes.duration && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Duration</span>
+                      <p className="mt-1 text-sm">{attributes.duration}</p>
+                    </div>
+                  )}
+                  {attributes.releaseDate && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Release Date</span>
+                      <p className="mt-1 text-sm">{new Date(attributes.releaseDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  {attributes.recordLabel && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Record Label</span>
+                      <p className="mt-1 text-sm">{attributes.recordLabel}</p>
+                    </div>
+                  )}
+                  {attributes.trackListing && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Track Listing</span>
+                      <div className="mt-1 text-sm whitespace-pre-line bg-muted/30 p-3 rounded-lg">
+                        {attributes.trackListing}
+                      </div>
+                    </div>
+                  )}
+                  {attributes.videoFile && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Music Video</span>
+                      <div className="mt-2">
+                        <Button asChild variant="outline" size="sm">
+                          <a href={attributes.videoFile} target="_blank" rel="noopener noreferrer">
+                            <FileVideo className="mr-2 h-4 w-4" />
+                            Watch Music Video
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Books Attributes */}
+              {product.category === "Books" && (
+                <>
+                  {attributes.author && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Author</span>
+                      <p className="mt-1 text-sm">{attributes.author}</p>
+                    </div>
+                  )}
+                  {attributes.isbn && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">ISBN</span>
+                      <p className="mt-1 text-sm">{attributes.isbn}</p>
+                    </div>
+                  )}
+                  {attributes.format && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Format</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.format.replace(/_/g, ' ')}</p>
+                    </div>
+                  )}
+                  {attributes.pages && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Pages</span>
+                      <p className="mt-1 text-sm">{attributes.pages}</p>
+                    </div>
+                  )}
+                  {attributes.publisher && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Publisher</span>
+                      <p className="mt-1 text-sm">{attributes.publisher}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Courses Attributes */}
+              {product.category === "Courses" && (
+                <>
+                  {attributes.instructor && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Instructor</span>
+                      <p className="mt-1 text-sm">{attributes.instructor}</p>
+                    </div>
+                  )}
+                  {attributes.skillLevel && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Skill Level</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.skillLevel}</p>
+                    </div>
+                  )}
+                  {attributes.courseDuration && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Duration</span>
+                      <p className="mt-1 text-sm">{attributes.courseDuration} hours</p>
+                    </div>
+                  )}
+                  {attributes.lessonsCount && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Lessons</span>
+                      <p className="mt-1 text-sm">{attributes.lessonsCount} lessons</p>
+                    </div>
+                  )}
+                  {attributes.learningOutcomes && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">What You'll Learn</span>
+                      <div className="mt-1 text-sm whitespace-pre-line bg-muted/30 p-3 rounded-lg">
+                        {attributes.learningOutcomes}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Clothes Attributes */}
+              {product.category === "Clothes" && (
+                <>
+                  {attributes.sizes && Array.isArray(attributes.sizes) && attributes.sizes.length > 0 && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Sizes Available</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {attributes.sizes.map((size: string) => (
+                          <Badge key={size} variant="secondary" className="text-xs">
+                            {size}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {attributes.colors && Array.isArray(attributes.colors) && attributes.colors.length > 0 && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Colors Available</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {attributes.colors.map((color: string) => (
+                          <Badge key={color} variant="secondary" className="text-xs">
+                            {color}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {attributes.material && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Material</span>
+                      <p className="mt-1 text-sm">{attributes.material}</p>
+                    </div>
+                  )}
+                  {attributes.gender && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Gender</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.gender}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Electronics Attributes */}
+              {product.category === "Electronics" && (
+                <>
+                  {attributes.brand && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Brand</span>
+                      <p className="mt-1 text-sm">{attributes.brand}</p>
+                    </div>
+                  )}
+                  {attributes.model && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Model</span>
+                      <p className="mt-1 text-sm">{attributes.model}</p>
+                    </div>
+                  )}
+                  {attributes.warranty && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Warranty</span>
+                      <p className="mt-1 text-sm">{attributes.warranty} months</p>
+                    </div>
+                  )}
+                  {attributes.condition && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Condition</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.condition}</p>
+                    </div>
+                  )}
+                  {attributes.specifications && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Technical Specifications</span>
+                      <div className="mt-1 text-sm whitespace-pre-line bg-muted/30 p-3 rounded-lg">
+                        {attributes.specifications}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Perfumes Attributes */}
+              {product.category === "Perfumes" && (
+                <>
+                  {attributes.volume && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Volume</span>
+                      <p className="mt-1 text-sm">{attributes.volume} ml</p>
+                    </div>
+                  )}
+                  {attributes.concentration && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Concentration</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.concentration.replace(/_/g, ' ')}</p>
+                    </div>
+                  )}
+                  {attributes.fragranceGender && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Target Gender</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.fragranceGender}</p>
+                    </div>
+                  )}
+                  {attributes.scentFamily && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Scent Family</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.scentFamily}</p>
+                    </div>
+                  )}
+                  {attributes.fragranceNotes && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Fragrance Notes</span>
+                      <div className="mt-1 text-sm whitespace-pre-line bg-muted/30 p-3 rounded-lg">
+                        {attributes.fragranceNotes}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Art & Crafts Attributes */}
+              {product.category === "Art & Crafts" && (
+                <>
+                  {attributes.medium && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Medium</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.medium.replace(/_/g, ' ')}</p>
+                    </div>
+                  )}
+                  {attributes.style && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Style</span>
+                      <p className="mt-1 text-sm">{attributes.style}</p>
+                    </div>
+                  )}
+                  {(attributes.width || attributes.height || attributes.depth) && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Dimensions</span>
+                      <p className="mt-1 text-sm">
+                        {attributes.width && `${attributes.width} cm`}
+                        {attributes.width && attributes.height && ' × '}
+                        {attributes.height && `${attributes.height} cm`}
+                        {attributes.depth && ` × ${attributes.depth} cm`}
+                      </p>
+                    </div>
+                  )}
+                  {attributes.artType && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Type</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.artType.replace(/_/g, ' ')}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Home Appliances & Kitchenware Attributes */}
+              {(product.category === "Home Appliances" || product.category === "Kitchenware") && (
+                <>
+                  {attributes.brand && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Brand</span>
+                      <p className="mt-1 text-sm">{attributes.brand}</p>
+                    </div>
+                  )}
+                  {attributes.modelNumber && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Model Number</span>
+                      <p className="mt-1 text-sm">{attributes.modelNumber}</p>
+                    </div>
+                  )}
+                  {attributes.warranty && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Warranty</span>
+                      <p className="mt-1 text-sm">{attributes.warranty} months</p>
+                    </div>
+                  )}
+                  {attributes.power && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Power</span>
+                      <p className="mt-1 text-sm">{attributes.power} Watts</p>
+                    </div>
+                  )}
+                  {attributes.dimensions && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Dimensions</span>
+                      <p className="mt-1 text-sm">{attributes.dimensions}</p>
+                    </div>
+                  )}
+                  {attributes.features && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Key Features</span>
+                      <div className="mt-1 text-sm whitespace-pre-line bg-muted/30 p-3 rounded-lg">
+                        {attributes.features}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Other Category Attributes */}
+              {product.category === "Other" && (
+                <>
+                  {attributes.brand && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Brand/Manufacturer</span>
+                      <p className="mt-1 text-sm">{attributes.brand}</p>
+                    </div>
+                  )}
+                  {attributes.modelNumber && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Model/Item Number</span>
+                      <p className="mt-1 text-sm">{attributes.modelNumber}</p>
+                    </div>
+                  )}
+                  {attributes.condition && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Condition</span>
+                      <p className="mt-1 text-sm capitalize">{attributes.condition.replace(/_/g, ' ')}</p>
+                    </div>
+                  )}
+                  {attributes.warranty && (
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Warranty</span>
+                      <p className="mt-1 text-sm">{attributes.warranty}</p>
+                    </div>
+                  )}
+                  {attributes.specifications && (
+                    <div className="sm:col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground">Additional Specifications</span>
+                      <div className="mt-1 text-sm whitespace-pre-line bg-muted/30 p-3 rounded-lg">
+                        {attributes.specifications}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          <Separator className="my-6" />
+        </>
+      )}
+
       {/* Digital Content Access Section */}
       {isDigital && (
         <>

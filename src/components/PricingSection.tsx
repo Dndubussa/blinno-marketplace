@@ -34,7 +34,7 @@ const subscriptionPlans = [
       "Marketing tools included",
       "Bulk product upload",
     ],
-    cta: "Start Free Trial",
+    cta: "Get Started Today",
     popular: true,
   },
   {
@@ -51,7 +51,7 @@ const subscriptionPlans = [
       "White-label options",
       "SLA guarantee",
     ],
-    cta: "Contact Sales",
+    cta: "Get Started Today",
     popular: false,
   },
 ];
@@ -102,7 +102,7 @@ const percentagePlans = [
       "Dedicated success manager",
       "Early access to features",
     ],
-    cta: "Contact Sales",
+    cta: "Get Started Today",
     popular: false,
   },
 ];
@@ -218,7 +218,7 @@ export function PricingSection() {
           className="mt-12 text-center text-sm text-muted-foreground"
         >
           {pricingModel === "subscription" 
-            ? "All subscription plans include a 14-day free trial. Cancel anytime."
+            ? "Cancel anytime."
             : "No monthly fees. You only pay when you make a sale."
           }
         </motion.p>

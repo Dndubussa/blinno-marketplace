@@ -34,7 +34,11 @@ async function getAuthToken(): Promise<string> {
   const apiKey = Deno.env.get("CLICKPESA_API_KEY");
 
   if (!clientId || !apiKey) {
-    throw new Error("ClickPesa credentials not configured");
+    console.error("Missing ClickPesa credentials:", {
+      hasClientId: !!clientId,
+      hasApiKey: !!apiKey
+    });
+    throw new Error("ClickPesa credentials not configured. Please check environment variables CLICKPESA_CLIENT_ID and CLICKPESA_API_KEY");
   }
 
   console.log("Generating new ClickPesa auth token...");
@@ -139,32 +143,62 @@ serve(async (req) => {
 
     switch (action) {
       case "initiate": {
-        const clickpesaToken = await getAuthToken();
-        const result = await initiatePayment(clickpesaToken, payload as PaymentRequest);
-        
-        // Store the transaction in the database
-        const { error: txError } = await supabase
-          .from("payment_transactions")
-          .insert({
-            user_id: user.id,
-            order_id: payload.order_id || null,
-            amount: payload.amount,
-            currency: payload.currency || "TZS",
-            network: payload.network,
-            phone_number: payload.phone_number,
-            reference: payload.reference,
-            clickpesa_reference: result.transaction_id || null,
-            status: "pending",
-            description: payload.description,
-          });
+        try {
+          // Validate required fields
+          if (!payload.amount || !payload.phone_number || !payload.network || !payload.reference) {
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: "Missing required payment fields: amount, phone_number, network, or reference" 
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
 
-        if (txError) {
-          console.error("Error storing transaction:", txError);
+          const clickpesaToken = await getAuthToken();
+          const result = await initiatePayment(clickpesaToken, payload as PaymentRequest);
+          
+          // Store the transaction in the database (non-blocking)
+          try {
+            const { error: txError } = await supabase
+              .from("payment_transactions")
+              .insert({
+                user_id: user.id,
+                order_id: payload.order_id || null,
+                amount: payload.amount,
+                currency: payload.currency || "TZS",
+                network: payload.network,
+                phone_number: payload.phone_number,
+                reference: payload.reference,
+                clickpesa_reference: result.transaction_id || result.reference || null,
+                status: "pending",
+                description: payload.description,
+              });
+
+            if (txError) {
+              console.error("Error storing transaction (non-critical):", txError);
+              // Don't fail the payment if transaction storage fails
+            }
+          } catch (dbError) {
+            console.error("Database error (non-critical):", dbError);
+            // Continue even if database insert fails
+          }
+          
+          return new Response(JSON.stringify({ success: true, data: result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (paymentError: unknown) {
+          const errorMessage = paymentError instanceof Error ? paymentError.message : "Unknown payment error";
+          console.error("Payment initiation error:", errorMessage);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: errorMessage,
+              details: paymentError instanceof Error ? paymentError.stack : undefined
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
-        
-        return new Response(JSON.stringify({ success: true, data: result }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
       }
 
       case "check-status": {
@@ -232,11 +266,26 @@ serve(async (req) => {
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("ClickPesa payment error:", errorMessage);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("ClickPesa payment error:", errorMessage, errorStack);
+    
+    // Check for specific error types
+    let statusCode = 500;
+    if (errorMessage.includes("credentials not configured") || errorMessage.includes("Unauthorized")) {
+      statusCode = 401;
+    } else if (errorMessage.includes("Missing required") || errorMessage.includes("Invalid")) {
+      statusCode = 400;
+    }
+    
     return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
+      JSON.stringify({ 
+        success: false, 
+        error: errorMessage,
+        // Only include stack in development
+        ...(Deno.env.get("ENVIRONMENT") === "development" ? { stack: errorStack } : {})
+      }),
       {
-        status: 500,
+        status: statusCode,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

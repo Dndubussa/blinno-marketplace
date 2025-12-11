@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +37,7 @@ type PricingModel = "subscription" | "percentage";
 type SubscriptionPlan = "starter" | "professional" | "enterprise";
 type PercentagePlan = "basic" | "growth" | "scale";
 type SellerPlan = SubscriptionPlan | PercentagePlan;
+type MobileNetwork = "MPESA" | "TIGOPESA" | "AIRTELMONEY" | "HALOPESA";
 
 interface OnboardingData {
   role: Role | null;
@@ -48,7 +50,15 @@ interface OnboardingData {
   phoneNumber: string;
   pricingModel: PricingModel;
   plan: SellerPlan;
+  paymentNetwork?: MobileNetwork;
 }
+
+const mobileNetworks: { id: MobileNetwork; name: string; color: string; description?: string }[] = [
+  { id: "MPESA", name: "M-Pesa", color: "bg-green-500", description: "Vodacom" },
+  { id: "TIGOPESA", name: "Tigo Pesa", color: "bg-blue-500", description: "Mix By Yas" },
+  { id: "AIRTELMONEY", name: "Airtel Money", color: "bg-red-500" },
+  { id: "HALOPESA", name: "Halopesa", color: "bg-orange-500" },
+];
 
 const buyerInterests = [
   { id: "electronics", label: "Electronics", icon: "💻" },
@@ -185,6 +195,9 @@ export default function Onboarding() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [pricingModel, setPricingModel] = useState<PricingModel>("subscription");
+  const [paymentReference, setPaymentReference] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<"pending" | "completed" | "failed" | null>(null);
+  const [pollCount, setPollCount] = useState(0);
   
   // Get role from location state (if coming from email verification or direct navigation)
   const roleFromState = location.state?.role as Role | undefined;
@@ -198,6 +211,7 @@ export default function Onboarding() {
     phoneNumber: "",
     pricingModel: "subscription",
     plan: "professional",
+    paymentNetwork: "MPESA", // Default to M-Pesa
   });
 
   const currentPlans = pricingModel === "subscription" ? subscriptionPlans : percentagePlans;
@@ -285,10 +299,22 @@ export default function Onboarding() {
       return;
     }
 
+    if (!data.paymentNetwork) {
+      toast({
+        title: "Payment method required",
+        description: "Please select a mobile money network",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessingPayment(true);
+    setPaymentStatus(null);
+    setPollCount(0);
 
     try {
       const selectedPlan = currentPlans.find((p) => p.id === data.plan);
+      const reference = `SUB-${user?.id?.slice(0, 8)}-${Date.now()}`;
       
       const { data: paymentData, error } = await supabase.functions.invoke(
         "clickpesa-payment",
@@ -298,35 +324,122 @@ export default function Onboarding() {
             amount: selectedPlan?.price || 0,
             currency: "TZS",
             phone_number: data.phoneNumber,
-            network: "MPESA",
-            reference: `SUB-${user?.id?.slice(0, 8)}-${Date.now()}`,
+            network: data.paymentNetwork || "MPESA",
+            reference: reference,
             description: `Blinno ${selectedPlan?.name} Plan Subscription`,
           },
         }
       );
 
-      if (error) throw error;
+      if (error) {
+        console.error("Payment function error:", error);
+        throw new Error(error.message || "Failed to connect to payment service");
+      }
+
+      if (!paymentData) {
+        throw new Error("No response from payment service");
+      }
 
       if (paymentData.success) {
+        // Store payment reference and start polling
+        const transactionId = paymentData.data?.transaction_id || paymentData.data?.reference || reference;
+        setPaymentReference(transactionId);
+        setPaymentStatus("pending");
+        
         toast({
           title: "Payment initiated",
-          description: "Check your phone for the M-Pesa prompt. Complete the payment to activate your plan.",
+          description: "Check your phone for the M-Pesa prompt. Please approve the payment to continue.",
         });
         
-        await handleComplete();
+        // Don't complete subscription yet - wait for payment confirmation
+        setIsProcessingPayment(false);
       } else {
-        throw new Error(paymentData.error || "Payment failed");
+        const errorMsg = paymentData.error || paymentData.message || "Payment failed";
+        console.error("Payment failed:", paymentData);
+        throw new Error(errorMsg);
       }
     } catch (error: any) {
+      console.error("Payment error:", error);
+      let errorMessage = "Could not process payment. Please try again.";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.error) {
+        errorMessage = error.error;
+      }
+      
       toast({
         title: "Payment failed",
-        description: error.message || "Could not process payment. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
-    } finally {
+      setPaymentStatus("failed");
       setIsProcessingPayment(false);
     }
   };
+
+  // Check payment status
+  const checkPaymentStatus = useCallback(async () => {
+    if (!paymentReference || paymentStatus !== "pending") return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
+        body: {
+          action: "check-status",
+          reference: paymentReference,
+          transaction_id: paymentReference,
+        },
+      });
+
+      if (error) {
+        console.error("Status check error:", error);
+        return;
+      }
+
+      if (data?.data?.status === "COMPLETED" || data?.data?.status === "PAYMENT_RECEIVED") {
+        setPaymentStatus("completed");
+        toast({
+          title: "Payment confirmed!",
+          description: "Your subscription is being activated...",
+        });
+        // Now complete the subscription
+        await handleComplete();
+      } else if (data?.data?.status === "FAILED" || data?.data?.status === "CANCELLED" || data?.data?.status === "PAYMENT_FAILED") {
+        setPaymentStatus("failed");
+        toast({
+          title: "Payment failed",
+          description: "The payment was not successful. Please try again.",
+          variant: "destructive",
+        });
+        setIsProcessingPayment(false);
+      }
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+    }
+  }, [paymentReference, paymentStatus, toast]);
+
+  // Poll for payment status every 5 seconds, up to 24 times (2 minutes)
+  useEffect(() => {
+    if (!paymentReference || paymentStatus !== "pending" || pollCount >= 24) {
+      if (pollCount >= 24 && paymentStatus === "pending") {
+        setPaymentStatus("failed");
+        toast({
+          title: "Payment timeout",
+          description: "Payment confirmation timed out. Please try again.",
+          variant: "destructive",
+        });
+        setIsProcessingPayment(false);
+      }
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      setPollCount((prev) => prev + 1);
+      await checkPaymentStatus();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [paymentReference, paymentStatus, pollCount, checkPaymentStatus, toast]);
 
   const handleComplete = async () => {
     setIsSubmitting(true);
@@ -841,14 +954,92 @@ export default function Onboarding() {
               </Card>
 
               {data.role === "seller" && data.pricingModel === "subscription" && (
-                <Card className="bg-muted/50">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground text-center">
-                      💳 Payment will be processed via M-Pesa to your number:{" "}
-                      <strong>{data.phoneNumber || "Not provided"}</strong>
-                    </p>
-                  </CardContent>
-                </Card>
+                <>
+                  {paymentStatus === "pending" ? (
+                    <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                      <CardContent className="p-6 text-center">
+                        <div className="flex items-center justify-center mb-4">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        </div>
+                        <h3 className="font-semibold text-foreground mb-2">Waiting for Payment</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Check your phone ({data.phoneNumber}) for the {mobileNetworks.find(n => n.id === data.paymentNetwork)?.name || "mobile money"} prompt and approve the payment.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          This page will automatically update when payment is confirmed.
+                        </p>
+                        {pollCount > 0 && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Checking payment status... ({pollCount}/24)
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ) : paymentStatus === "failed" ? (
+                    <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
+                      <CardContent className="p-6 text-center">
+                        <h3 className="font-semibold text-foreground mb-2">Payment Failed</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          The payment was not successful. Please try again.
+                        </p>
+                        <Button onClick={handlePayment} variant="outline" size="sm">
+                          Retry Payment
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card>
+                      <CardContent className="p-6 space-y-4">
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Select Payment Method</Label>
+                          <RadioGroup
+                            value={data.paymentNetwork || "MPESA"}
+                            onValueChange={(value) => setData({ ...data, paymentNetwork: value as MobileNetwork })}
+                            className="grid grid-cols-2 gap-3"
+                            disabled={isProcessingPayment || paymentStatus === "pending"}
+                          >
+                            {mobileNetworks.map((network) => (
+                              <div key={network.id}>
+                                <RadioGroupItem
+                                  value={network.id}
+                                  id={network.id}
+                                  className="peer sr-only"
+                                />
+                                <Label
+                                  htmlFor={network.id}
+                                  className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                                >
+                                  <div className={`h-8 w-8 rounded-full ${network.color} flex items-center justify-center mb-1`}>
+                                    <Phone className="h-4 w-4 text-white" />
+                                  </div>
+                                  <span className="font-medium text-sm">{network.name}</span>
+                                  {network.description && (
+                                    <span className="text-xs text-muted-foreground">{network.description}</span>
+                                  )}
+                                </Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="payment-phone" className="text-sm font-medium">
+                            Mobile Money Number
+                          </Label>
+                          <Input
+                            id="payment-phone"
+                            placeholder="+255 XXX XXX XXX"
+                            value={data.phoneNumber}
+                            onChange={(e) => setData({ ...data, phoneNumber: e.target.value })}
+                            disabled={isProcessingPayment || paymentStatus === "pending"}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Payment will be processed via {mobileNetworks.find(n => n.id === data.paymentNetwork)?.name || "selected network"}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
 
               <div className="flex justify-between">
@@ -874,12 +1065,17 @@ export default function Onboarding() {
                 ) : (
                   <Button
                     onClick={handlePayment}
-                    disabled={isSubmitting || isProcessingPayment}
+                    disabled={isSubmitting || isProcessingPayment || paymentStatus === "pending"}
                   >
                     {isSubmitting || isProcessingPayment ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {isProcessingPayment ? "Processing..." : "Setting up..."}
+                        {isProcessingPayment ? "Initiating payment..." : "Setting up..."}
+                      </>
+                    ) : paymentStatus === "pending" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Waiting for payment...
                       </>
                     ) : data.pricingModel === "percentage" ? (
                       <>
