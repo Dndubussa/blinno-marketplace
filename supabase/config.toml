@@ -1,0 +1,52 @@
+project_id = "zctpronhcgyvcgvzhfjv"
+
+[functions.order-notification]
+verify_jwt = false
+
+[functions.security-alert]
+verify_jwt = false
+
+[functions.newsletter-subscribe]
+verify_jwt = false
+
+[functions.shipping-notification]
+verify_jwt = false
+
+[functions.order-confirmation]
+verify_jwt = false
+
+[functions.newsletter-campaign]
+verify_jwt = false
+
+[functions.scheduled-analytics-report]
+verify_jwt = false
+
+[functions.get-mapbox-token]
+verify_jwt = false
+
+[functions.clickpesa-payment]
+verify_jwt = true
+
+[functions.clickpesa-webhook]
+verify_jwt = false
+
+[functions.payment-receipt-email]
+verify_jwt = false
+
+[functions.seller-withdrawal]
+verify_jwt = true
+
+[functions.withdrawal-notification]
+verify_jwt = false
+
+[functions.verification-email]
+verify_jwt = false
+
+[functions.payout-webhook]
+verify_jwt = false
+
+[functions.get-signed-url]
+verify_jwt = true
+
+[functions.message-notification]
+verify_jwt = false

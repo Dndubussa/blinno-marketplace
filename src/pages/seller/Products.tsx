@@ -1,0 +1,502 @@
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import CategoryFields from "@/components/seller/CategoryFields";
+import ImageGalleryUpload from "@/components/seller/ImageGalleryUpload";
+
+interface Product {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  category: string;
+  stock_quantity: number;
+  is_active: boolean;
+  created_at: string;
+  attributes?: Record<string, any> | null;
+  images?: string[] | null;
+}
+
+const categories = [
+  "Clothes",
+  "Perfumes",
+  "Home Appliances",
+  "Kitchenware",
+  "Electronics",
+  "Books",
+  "Art & Crafts",
+  "Music",
+  "Courses",
+  "Other",
+];
+
+export default function Products() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    price: "",
+    category: "",
+    stock_quantity: "",
+  });
+  const [attributes, setAttributes] = useState<Record<string, any>>({});
+  const [productImages, setProductImages] = useState<string[]>([]);
+
+  const fetchProducts = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("seller_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching products:", error);
+    } else {
+      setProducts((data || []).map(p => ({
+        ...p,
+        attributes: (typeof p.attributes === 'object' && p.attributes !== null) 
+          ? p.attributes as Record<string, any>
+          : {},
+        images: p.images || [],
+      })));
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, [user]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) return;
+
+    const productData = {
+      title: formData.title,
+      description: formData.description || null,
+      price: parseFloat(formData.price),
+      category: formData.category,
+      stock_quantity: parseInt(formData.stock_quantity) || 0,
+      seller_id: user.id,
+      attributes: attributes,
+      images: productImages,
+    };
+
+    let error;
+
+    if (editingProduct) {
+      const { error: updateError } = await supabase
+        .from("products")
+        .update(productData)
+        .eq("id", editingProduct.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from("products")
+        .insert(productData);
+      error = insertError;
+    }
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: editingProduct ? "Product updated" : "Product created",
+        description: `${formData.title} has been ${editingProduct ? "updated" : "added"} successfully.`,
+      });
+      setIsDialogOpen(false);
+      setEditingProduct(null);
+      setFormData({
+        title: "",
+        description: "",
+        price: "",
+        category: "",
+        stock_quantity: "",
+      });
+      setAttributes({});
+      setProductImages([]);
+      fetchProducts();
+    }
+  };
+
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({
+      title: product.title,
+      description: product.description || "",
+      price: product.price.toString(),
+      category: product.category,
+      stock_quantity: product.stock_quantity.toString(),
+    });
+    setAttributes(product.attributes || {});
+    setProductImages(product.images || []);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("products").delete().eq("id", id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Product deleted",
+        description: "The product has been removed.",
+      });
+      fetchProducts();
+    }
+  };
+
+  const toggleActive = async (product: Product) => {
+    const { error } = await supabase
+      .from("products")
+      .update({ is_active: !product.is_active })
+      .eq("id", product.id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      fetchProducts();
+    }
+  };
+
+  const filteredProducts = products.filter(
+    (p) =>
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Products</h1>
+          <p className="text-muted-foreground">
+            Manage your product listings and inventory.
+          </p>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="hero"
+              onClick={() => {
+                setEditingProduct(null);
+                setFormData({
+                  title: "",
+                  description: "",
+                  price: "",
+                  category: "",
+                  stock_quantity: "",
+                });
+                setAttributes({});
+                setProductImages([]);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Product
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>
+                {editingProduct ? "Edit Product" : "Add New Product"}
+              </DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="max-h-[70vh] pr-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => {
+                      setFormData({ ...formData, category: value });
+                      setAttributes({});
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category first" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="title">Product Title</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
+                    placeholder="Enter product title"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    placeholder="Describe your product..."
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price ($)</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.price}
+                      onChange={(e) =>
+                        setFormData({ ...formData, price: e.target.value })
+                      }
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="stock">Stock Quantity</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      min="0"
+                      value={formData.stock_quantity}
+                      onChange={(e) =>
+                        setFormData({ ...formData, stock_quantity: e.target.value })
+                      }
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Image Gallery */}
+                {user && (
+                  <ImageGalleryUpload
+                    images={productImages}
+                    onChange={setProductImages}
+                    userId={user.id}
+                    maxImages={6}
+                  />
+                )}
+
+                {/* Category-specific fields */}
+                {formData.category && user && (
+                  <CategoryFields
+                    category={formData.category}
+                    attributes={attributes}
+                    onChange={setAttributes}
+                    userId={user.id}
+                  />
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="hero" className="flex-1">
+                    {editingProduct ? "Save Changes" : "Add Product"}
+                  </Button>
+                </div>
+              </form>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search products..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Products Table */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="border border-border rounded-lg overflow-hidden"
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Product</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Stock</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={6}>
+                    <div className="h-12 animate-pulse bg-muted rounded" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : filteredProducts.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  No products found. Add your first product to get started!
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredProducts.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell className="font-medium">{product.title}</TableCell>
+                  <TableCell>{product.category}</TableCell>
+                  <TableCell>${product.price.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={product.stock_quantity > 10 ? "default" : "destructive"}
+                    >
+                      {product.stock_quantity} in stock
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={product.is_active ? "default" : "secondary"}>
+                      {product.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEdit(product)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => toggleActive(product)}>
+                          {product.is_active ? (
+                            <>
+                              <EyeOff className="mr-2 h-4 w-4" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Activate
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDelete(product.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </motion.div>
+    </div>
+  );
+}

@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 20% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 15%;
+
+    --primary: 209 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 145 63% 42%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 20% 15%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 209 100% 50%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens - Professional light theme */
+    --gradient-primary: linear-gradient(135deg, hsl(209 100% 50%) 0%, hsl(209 100% 60%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(145 63% 42%) 0%, hsl(145 63% 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 20% 99%) 100%);
+    
+    --shadow-soft: 0 1px 3px 0 hsl(220 20% 20% / 0.1), 0 1px 2px -1px hsl(220 20% 20% / 0.1);
+    --shadow-glow: 0 4px 6px -1px hsl(209 100% 50% / 0.1), 0 2px 4px -2px hsl(209 100% 50% / 0.1);
+    --shadow-card: 0 4px 6px -1px hsl(220 20% 20% / 0.1), 0 2px 4px -2px hsl(220 20% 20% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(220 20% 20% / 0.1), 0 4px 6px -4px hsl(220 20% 20% / 0.1);
+
+    /* Category colors */
+    --category-products: 209 100% 50%;
+    --category-books: 262 83% 58%;
+    --category-creators: 340 82% 52%;
+    --category-courses: 45 93% 47%;
+    --category-services: 145 63% 42%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 20% 95%;
+
+    --card: 222 47% 9%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 209 100% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 145 63% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 220 15% 70%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 20% 95%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 20% 95%;
+
+    --border: 217 33% 22%;
+    --input: 217 33% 22%;
+    --ring: 209 100% 55%;
+
+    --gradient-hero: linear-gradient(180deg, hsl(222 47% 8%) 0%, hsl(222 47% 6%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(222 47% 11%) 0%, hsl(222 47% 9%) 100%);
+    --shadow-soft: 0 4px 20px -2px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 40px -10px hsl(209 100% 55% / 0.3);
+    --shadow-card: 0 10px 40px -10px hsl(0 0% 0% / 0.5);
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 209 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 209 100% 55%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  .bg-gradient-primary {
+    background-image: var(--gradient-primary);
+  }
+
+  .bg-gradient-accent {
+    background-image: var(--gradient-accent);
+  }
+
+  .bg-gradient-hero {
+    background-image: var(--gradient-hero);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-lg-custom {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+}
