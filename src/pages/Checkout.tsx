@@ -620,7 +620,6 @@ export default function Checkout() {
                         value={selectedNetwork}
                         onValueChange={(value) => setSelectedNetwork(value as MobileNetwork)}
                         className="grid grid-cols-2 gap-4"
-                        disabled={isProcessing}
                       >
                         {mobileNetworks.map((network) => (
                           <div key={network.id}>
@@ -628,10 +627,15 @@ export default function Checkout() {
                               value={network.id}
                               id={network.id}
                               className="peer sr-only"
+                              disabled={isProcessing}
                             />
                             <Label
                               htmlFor={network.id}
-                              className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                              className={`flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 transition-all ${
+                                isProcessing
+                                  ? "cursor-not-allowed opacity-50"
+                                  : "hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                              } peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary`}
                             >
                               <div className={`h-10 w-10 rounded-full ${network.color} flex items-center justify-center mb-2`}>
                                 <Phone className="h-5 w-5 text-white" />

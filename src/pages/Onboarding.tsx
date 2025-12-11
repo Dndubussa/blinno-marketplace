@@ -996,29 +996,36 @@ export default function Onboarding() {
                             value={data.paymentNetwork || "MPESA"}
                             onValueChange={(value) => setData({ ...data, paymentNetwork: value as MobileNetwork })}
                             className="grid grid-cols-2 gap-3"
-                            disabled={isProcessingPayment || paymentStatus === "pending"}
                           >
-                            {mobileNetworks.map((network) => (
-                              <div key={network.id}>
-                                <RadioGroupItem
-                                  value={network.id}
-                                  id={network.id}
-                                  className="peer sr-only"
-                                />
-                                <Label
-                                  htmlFor={network.id}
-                                  className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
-                                >
-                                  <div className={`h-8 w-8 rounded-full ${network.color} flex items-center justify-center mb-1`}>
-                                    <Phone className="h-4 w-4 text-white" />
-                                  </div>
-                                  <span className="font-medium text-sm">{network.name}</span>
-                                  {network.description && (
-                                    <span className="text-xs text-muted-foreground">{network.description}</span>
-                                  )}
-                                </Label>
-                              </div>
-                            ))}
+                            {mobileNetworks.map((network) => {
+                              const isDisabled = isProcessingPayment || paymentStatus === "pending";
+                              return (
+                                <div key={network.id}>
+                                  <RadioGroupItem
+                                    value={network.id}
+                                    id={network.id}
+                                    className="peer sr-only"
+                                    disabled={isDisabled}
+                                  />
+                                  <Label
+                                    htmlFor={network.id}
+                                    className={`flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-3 transition-all ${
+                                      isDisabled
+                                        ? "cursor-not-allowed opacity-50"
+                                        : "hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                    } peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary`}
+                                  >
+                                    <div className={`h-8 w-8 rounded-full ${network.color} flex items-center justify-center mb-1`}>
+                                      <Phone className="h-4 w-4 text-white" />
+                                    </div>
+                                    <span className="font-medium text-sm">{network.name}</span>
+                                    {network.description && (
+                                      <span className="text-xs text-muted-foreground">{network.description}</span>
+                                    )}
+                                  </Label>
+                                </div>
+                              );
+                            })}
                           </RadioGroup>
                         </div>
                         <div className="space-y-2">
