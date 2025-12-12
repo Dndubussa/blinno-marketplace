@@ -237,6 +237,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Handle tab visibility changes - prevent unnecessary refetches
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // When tab becomes visible, only refresh if session is about to expire
+      // Don't refetch profile/roles unnecessarily
+      if (!document.hidden && session?.user) {
+        // Check if token needs refresh (Supabase handles this automatically)
+        // We don't need to manually refetch here
+        // Supabase auth state listener will handle token refresh
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [session]);
+
   const signUp = async (email: string, password: string, fullName: string, intendedRole?: "buyer" | "seller") => {
     const redirectUrl = `${window.location.origin}/verify-email?verified=true`;
 

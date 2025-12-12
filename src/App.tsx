@@ -65,7 +65,31 @@ import BuyerSettings from "./pages/buyer/Settings";
 import DigitalLibrary from "./pages/buyer/DigitalLibrary";
 import BuyerMessages from "./pages/buyer/Messages";
 import SellerMessages from "./pages/seller/Messages";
-const queryClient = new QueryClient();
+// Configure React Query to prevent unnecessary refetches on tab switch
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Prevent refetching when window regains focus (tab switch)
+      refetchOnWindowFocus: false,
+      // Prevent refetching on reconnect (unless data is stale)
+      refetchOnReconnect: false,
+      // Prevent refetching on mount if data exists
+      refetchOnMount: false,
+      // Keep data fresh for 5 minutes (300000ms)
+      staleTime: 5 * 60 * 1000,
+      // Keep unused data in cache for 10 minutes
+      gcTime: 10 * 60 * 1000, // Previously cacheTime
+      // Retry failed requests once
+      retry: 1,
+      // Retry delay
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+    mutations: {
+      // Retry failed mutations once
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

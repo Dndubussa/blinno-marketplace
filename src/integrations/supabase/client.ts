@@ -14,5 +14,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true, // Automatically detect and process session from URL hash
-  }
+  },
+  global: {
+    headers: {
+      "x-client-info": "blinno-web",
+    },
+  },
 });
