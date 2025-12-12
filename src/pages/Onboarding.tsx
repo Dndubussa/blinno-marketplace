@@ -130,30 +130,27 @@ export default function Onboarding() {
     }
   }, [onboardingLoading, onboardingStatus, navigate, toast]);
 
-  // Initialize seller steps when seller type is selected or status is loaded
+  // Initialize seller steps only on initial load or when loading from database
   useEffect(() => {
     if (data.role === "seller" && !onboardingLoading) {
-      // If user already has seller type from database, use it
+      // If user already has seller type from database, use it (initial load)
       if (onboardingStatus?.sellerType && !data.sellerType) {
         setData((prev) => ({ ...prev, sellerType: onboardingStatus.sellerType }));
         // Load steps for existing seller type
         const steps = getOrderedSteps(onboardingStatus.sellerType, false);
         setSellerSteps(steps);
-      } else if (data.sellerType) {
-        // If seller type is already selected in local state, ensure steps are loaded
-        if (sellerSteps.length === 0) {
-          const steps = getOrderedSteps(data.sellerType, false);
-          setSellerSteps(steps);
-        }
-      } else {
-        // New seller - start with just category step
+      } else if (!data.sellerType && sellerSteps.length === 0) {
+        // New seller - start with just category step (only if no steps loaded yet)
         const categoryStep = getStepConfig("category");
         if (categoryStep) {
           setSellerSteps([categoryStep]);
+          setSellerStepIndex(0);
         }
       }
+      // Don't reload steps if sellerType is already set in local state
+      // That's handled by handleSellerFieldChange when user selects a type
     }
-  }, [data.role, data.sellerType, onboardingLoading, onboardingStatus]);
+  }, [data.role, onboardingLoading, onboardingStatus]);
 
   // Handle role selection
   const handleRoleSelect = (role: Role) => {
@@ -211,7 +208,11 @@ export default function Onboarding() {
       // Reload steps for the selected seller type using the selected type directly
       const steps = getOrderedSteps(value, false); // false = only required steps
       setSellerSteps(steps);
-      setSellerStepIndex(0);
+      // Ensure we're on the category step (index 0) when seller type is selected
+      // This is the first step, so index should be 0
+      if (sellerStepIndex !== 0 || steps[0]?.id !== "category") {
+        setSellerStepIndex(0);
+      }
     }
   };
 
