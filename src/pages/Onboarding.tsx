@@ -445,8 +445,8 @@ export default function Onboarding() {
         throw new Error(`Invalid subscription plan: "${selectedPlan}". Valid plans are: ${Object.keys(subscriptionPrices).join(", ")}`);
       }
 
-      // Format phone number for ClickPesa (ensure it starts with 255)
-      // ClickPesa requires format: 255XXXXXXXXX (no +, no spaces)
+      // Format phone number for Flutterwave (ensure it starts with 255)
+      // Flutterwave requires format: 255XXXXXXXXX (no +, no spaces)
       let formattedPhone = data.phoneNumber.replace(/\D/g, ""); // Remove all non-digits
       if (formattedPhone.startsWith("0")) {
         // Convert 0XXXXXXXXX to 255XXXXXXXXX
@@ -493,7 +493,7 @@ export default function Onboarding() {
 
       console.log("Sending payment request:", JSON.stringify(paymentPayload, null, 2));
 
-      const { data: paymentData, error } = await supabase.functions.invoke("clickpesa-payment", {
+      const { data: paymentData, error } = await supabase.functions.invoke("flutterwave-payment", {
         body: paymentPayload,
       });
 
@@ -581,7 +581,7 @@ export default function Onboarding() {
     if (!paymentReference || paymentStatus !== "pending") return;
 
     try {
-      const { data: statusData, error } = await supabase.functions.invoke("clickpesa-payment", {
+      const { data: statusData, error } = await supabase.functions.invoke("flutterwave-payment", {
         body: {
           action: "check-status",
           reference: paymentReference,

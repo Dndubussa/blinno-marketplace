@@ -142,7 +142,7 @@ export default function BuyerPayments() {
     setIsTesting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
+      const { data, error } = await supabase.functions.invoke("flutterwave-payment", {
         body: {
           action: "initiate",
           amount: 100,

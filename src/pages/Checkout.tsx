@@ -190,9 +190,9 @@ export default function Checkout() {
       // Generate payment reference
       const reference = `ORDER-${order.id.substring(0, 8).toUpperCase()}`;
 
-      // Initiate ClickPesa payment
+      // Initiate Flutterwave payment
       const { data: paymentResult, error: paymentError } = await supabase.functions.invoke(
-        "clickpesa-payment",
+        "flutterwave-payment",
         {
           body: {
             action: "initiate",
@@ -203,6 +203,8 @@ export default function Checkout() {
             reference: reference,
             description: `Blinno Order Payment - ${items.length} item(s)`,
             order_id: order.id,
+            email: shippingData.email,
+            name: shippingData.fullName,
           },
         }
       );
