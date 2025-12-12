@@ -75,16 +75,21 @@ const getAlertContent = (alertType: string, userName: string): { subject: string
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
-  
-  // Handle CORS preflight requests
+  // Handle CORS preflight requests FIRST, before any other processing
   if (req.method === "OPTIONS") {
+    const origin = req.headers.get("origin");
+    const corsHeaders = getCorsHeaders(origin);
     return new Response(null, { 
       status: 204,
-      headers: corsHeaders
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      }
     });
   }
+
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
 
   try {
     const { email, alertType, userName, ipAddress, location, deviceInfo, timestamp }: SecurityAlertRequest = await req.json();
