@@ -3,6 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { sendSecurityAlert } from "@/lib/notifications";
+import { checkAppVersion, updateAppVersion, clearAppVersion } from "@/lib/appVersion";
 
 type AppRole = "admin" | "seller" | "buyer";
 
@@ -169,6 +170,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Check app version FIRST - sign out if version changed (app was redeployed)
+    const versionChanged = checkAppVersion();
+    if (versionChanged) {
+      console.log("App version changed - signing out all users");
+      
+      // Sign out from Supabase first
+      supabase.auth.signOut().catch(console.error);
+      
+      // Clear auth-related localStorage items (but keep app version)
+      localStorage.removeItem("blinno-cart");
+      localStorage.removeItem("blinno-wishlist");
+      localStorage.removeItem("blinno-saved-searches");
+      localStorage.removeItem("blinno_new_user_signup");
+      localStorage.removeItem("blinno_intended_role");
+      localStorage.removeItem("blinno_onboarding_tour_completed");
+      localStorage.removeItem("blinno_seller_onboarding_tour_completed");
+      // Note: We don't clear the Supabase auth session from localStorage here
+      // as signOut() handles that, but we update the version AFTER clearing
+      
+      // Update to new version (this saves the new version to localStorage)
+      updateAppVersion();
+      
+      // Show notification
+      toast({
+        title: "Platform Updated",
+        description: "The platform has been updated. Please sign in again to continue.",
+        variant: "default",
+      });
+      
+      // Reset all state
+      setProfile(null);
+      setRoles([]);
+      setUser(null);
+      setSession(null);
+      setLoading(false);
+      
+      return; // Exit early - don't set up auth listener
+    }
+
+    // Update app version if it matches (normal load - ensures version is stored)
+    updateAppVersion();
+
     let isInitialLoad = true;
     let lastUserId: string | null = null;
     let hasProfileForUser = false;
@@ -363,6 +406,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    // Clear app version on sign out (will be set again on next load)
+    clearAppVersion();
   };
 
   const hasRole = (role: AppRole) => {
