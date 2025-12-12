@@ -76,29 +76,18 @@ const getAlertContent = (alertType: string, userName: string): { subject: string
 
 serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests FIRST - absolutely before anything else
+  // This MUST be the very first thing checked, before any other processing
   if (req.method === "OPTIONS") {
-    try {
-      const origin = req.headers.get("origin");
-      const corsHeaders = getCorsHeaders(origin);
-      return new Response(null, { 
-        status: 204,
-        headers: {
-          ...corsHeaders,
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-        }
-      });
-    } catch (error) {
-      // Even if there's an error, return 204 for OPTIONS
-      console.error("Error in OPTIONS handler:", error);
-      return new Response(null, { 
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-        }
-      });
-    }
+    // Return 204 immediately with CORS headers - no try-catch needed for simple response
+    const origin = req.headers.get("origin");
+    const corsHeaders = getCorsHeaders(origin);
+    return new Response(null, { 
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      }
+    });
   }
 
   const origin = req.headers.get("origin");

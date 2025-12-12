@@ -13,6 +13,11 @@ export async function checkOnboardingAfterLogin(
   userId: string,
   roles: AppRole[]
 ): Promise<{ shouldRedirect: boolean; redirectPath: string | null }> {
+  // Ensure roles is an array
+  if (!roles || !Array.isArray(roles)) {
+    return { shouldRedirect: false, redirectPath: null };
+  }
+  
   // Only check for sellers
   if (!roles.includes("seller")) {
     return { shouldRedirect: false, redirectPath: null };

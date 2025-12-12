@@ -10,6 +10,11 @@ import type { AppRole } from "@/hooks/useAuth";
  * Priority: admin > seller > buyer > marketplace
  */
 export function getAuthRedirectPath(roles: AppRole[]): string {
+  // Ensure roles is an array
+  if (!roles || !Array.isArray(roles)) {
+    return "/products";
+  }
+  
   // Admin users go to admin dashboard
   if (roles.includes("admin")) {
     return "/admin";

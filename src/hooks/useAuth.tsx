@@ -411,7 +411,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasRole = (role: AppRole) => {
-    return roles.includes(role);
+    return roles && Array.isArray(roles) && roles.includes(role);
   };
 
   const becomeSeller = async () => {
