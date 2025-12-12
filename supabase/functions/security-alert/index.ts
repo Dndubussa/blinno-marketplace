@@ -60,10 +60,15 @@ const getAlertContent = (alertType: string, userName: string): { subject: string
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  console.log("Security alert function called");
-
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      }
+    });
   }
 
   try {

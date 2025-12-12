@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
@@ -198,6 +198,7 @@ export default function Onboarding() {
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "completed" | "failed" | null>(null);
   const [pollCount, setPollCount] = useState(0);
+  const pollCountRef = useRef(0);
   
   // Get role from location state (if coming from email verification or direct navigation)
   const roleFromState = location.state?.role as Role | undefined;
@@ -378,70 +379,8 @@ export default function Onboarding() {
     }
   };
 
-  // Check payment status
-  const checkPaymentStatus = useCallback(async () => {
-    if (!paymentReference || paymentStatus !== "pending") return;
-
-    try {
-      const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
-        body: {
-          action: "check-status",
-          reference: paymentReference,
-          transaction_id: paymentReference,
-        },
-      });
-
-      if (error) {
-        console.error("Status check error:", error);
-        return;
-      }
-
-      if (data?.data?.status === "COMPLETED" || data?.data?.status === "PAYMENT_RECEIVED") {
-        setPaymentStatus("completed");
-        toast({
-          title: "Payment confirmed!",
-          description: "Your subscription is being activated...",
-        });
-        // Now complete the subscription
-        await handleComplete();
-      } else if (data?.data?.status === "FAILED" || data?.data?.status === "CANCELLED" || data?.data?.status === "PAYMENT_FAILED") {
-        setPaymentStatus("failed");
-        toast({
-          title: "Payment failed",
-          description: "The payment was not successful. Please try again.",
-          variant: "destructive",
-        });
-        setIsProcessingPayment(false);
-      }
-    } catch (error) {
-      console.error("Error checking payment status:", error);
-    }
-  }, [paymentReference, paymentStatus, toast]);
-
-  // Poll for payment status every 5 seconds, up to 24 times (2 minutes)
-  useEffect(() => {
-    if (!paymentReference || paymentStatus !== "pending" || pollCount >= 24) {
-      if (pollCount >= 24 && paymentStatus === "pending") {
-        setPaymentStatus("failed");
-        toast({
-          title: "Payment timeout",
-          description: "Payment confirmation timed out. Please try again.",
-          variant: "destructive",
-        });
-        setIsProcessingPayment(false);
-      }
-      return;
-    }
-
-    const interval = setInterval(async () => {
-      setPollCount((prev) => prev + 1);
-      await checkPaymentStatus();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [paymentReference, paymentStatus, pollCount, checkPaymentStatus, toast]);
-
-  const handleComplete = async () => {
+  // Complete onboarding and create subscription
+  const handleComplete = useCallback(async () => {
     setIsSubmitting(true);
 
     try {
@@ -508,7 +447,83 @@ export default function Onboarding() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [data, user, becomeSeller, currentPlans, navigate, toast]);
+
+  // Check payment status
+  const checkPaymentStatus = useCallback(async () => {
+    if (!paymentReference || paymentStatus !== "pending") return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
+        body: {
+          action: "check-status",
+          reference: paymentReference,
+          transaction_id: paymentReference,
+        },
+      });
+
+      if (error) {
+        console.error("Status check error:", error);
+        return;
+      }
+
+      if (data?.data?.status === "COMPLETED" || data?.data?.status === "PAYMENT_RECEIVED") {
+        setPaymentStatus("completed");
+        toast({
+          title: "Payment confirmed!",
+          description: "Your subscription is being activated...",
+        });
+        // Now complete the subscription
+        await handleComplete();
+      } else if (data?.data?.status === "FAILED" || data?.data?.status === "CANCELLED" || data?.data?.status === "PAYMENT_FAILED") {
+        setPaymentStatus("failed");
+        toast({
+          title: "Payment failed",
+          description: "The payment was not successful. Please try again.",
+          variant: "destructive",
+        });
+        setIsProcessingPayment(false);
+      }
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+    }
+  }, [paymentReference, paymentStatus, toast, handleComplete]);
+
+  // Poll for payment status every 5 seconds, up to 24 times (2 minutes)
+  useEffect(() => {
+    if (!paymentReference || paymentStatus !== "pending") {
+      // Reset poll count when not polling
+      pollCountRef.current = 0;
+      setPollCount(0);
+      return;
+    }
+
+    // Reset poll count when starting new polling session
+    pollCountRef.current = 0;
+    setPollCount(0);
+
+    const interval = setInterval(async () => {
+      pollCountRef.current += 1;
+      setPollCount(pollCountRef.current);
+      
+      // Check if we've exceeded the limit (after 24 checks = 2 minutes)
+      if (pollCountRef.current > 24) {
+        clearInterval(interval);
+        setPaymentStatus("failed");
+        toast({
+          title: "Payment timeout",
+          description: "Payment confirmation timed out. Please try again.",
+          variant: "destructive",
+        });
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      await checkPaymentStatus();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [paymentReference, paymentStatus, checkPaymentStatus, toast]);
 
   if (loading) {
     return (

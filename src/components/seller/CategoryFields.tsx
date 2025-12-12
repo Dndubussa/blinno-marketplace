@@ -50,8 +50,16 @@ export default function CategoryFields({ category, attributes, onChange, userId 
     }
 
     setUploading(true);
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
-    const fileName = `${userId}/${Date.now()}.${fileExt}`;
+    
+    // Extract file extension, handling files without extensions
+    const fileParts = file.name.split('.');
+    const fileExt = fileParts.length > 1 
+      ? fileParts.pop()?.toLowerCase() || 'bin'  // Use 'bin' as fallback if pop() somehow returns undefined
+      : 'bin';  // No extension found, use 'bin' as default
+    
+    // Validate fileExt is not undefined or empty
+    const validExt = fileExt && fileExt.length > 0 ? fileExt : 'bin';
+    const fileName = `${userId}/${Date.now()}.${validExt}`;
 
     try {
       const { data, error } = await supabase.storage
