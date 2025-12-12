@@ -413,14 +413,40 @@ export default function Onboarding() {
           ? subscriptionPrices[selectedPlan] || 0
           : percentagePrices[selectedPlan] || 0;
 
+      // Format phone number for ClickPesa (ensure it starts with 255)
+      // ClickPesa requires format: 255XXXXXXXXX (no +, no spaces)
+      let formattedPhone = data.phoneNumber.replace(/\D/g, ""); // Remove all non-digits
+      if (formattedPhone.startsWith("0")) {
+        // Convert 0XXXXXXXXX to 255XXXXXXXXX
+        formattedPhone = "255" + formattedPhone.substring(1);
+      } else if (formattedPhone.startsWith("+255")) {
+        // Remove + if present
+        formattedPhone = formattedPhone.substring(1);
+      } else if (!formattedPhone.startsWith("255")) {
+        // If it doesn't start with 255, add it
+        formattedPhone = "255" + formattedPhone;
+      }
+
+      // Validate phone number format (should be 12 digits: 255 + 9 digits)
+      if (formattedPhone.length !== 12 || !formattedPhone.startsWith("255")) {
+        throw new Error("Invalid phone number format. Please use format: +255 XXX XXX XXX or 0XXX XXX XXX");
+      }
+
       const reference = `SUB-${user?.id?.slice(0, 8)}-${Date.now()}`;
+
+      console.log("Initiating ClickPesa payment for subscription:", {
+        amount: planPrice,
+        phone: formattedPhone,
+        network: data.paymentNetwork,
+        reference,
+      });
 
       const { data: paymentData, error } = await supabase.functions.invoke("clickpesa-payment", {
         body: {
           action: "initiate",
           amount: planPrice,
           currency: "TZS",
-          phone_number: data.phoneNumber,
+          phone_number: formattedPhone, // Use formatted phone number
           network: data.paymentNetwork || "MPESA",
           reference: reference,
           description: `Blinno ${selectedPlan} Plan Subscription`,
