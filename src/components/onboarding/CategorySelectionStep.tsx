@@ -7,13 +7,16 @@ import { motion } from "framer-motion";
 import { sellerTypes, type SellerType } from "@/lib/sellerTypes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
 
 interface CategorySelectionStepProps {
   selectedType: SellerType | null;
   onSelect: (type: SellerType) => void;
+  onNext?: () => void;
 }
 
-export function CategorySelectionStep({ selectedType, onSelect }: CategorySelectionStepProps) {
+export function CategorySelectionStep({ selectedType, onSelect, onNext }: CategorySelectionStepProps) {
   const typeEntries = Object.entries(sellerTypes) as [SellerType, typeof sellerTypes[SellerType]][];
 
   return (
@@ -67,6 +70,16 @@ export function CategorySelectionStep({ selectedType, onSelect }: CategorySelect
           );
         })}
       </div>
+
+      {/* Continue button - only shows when a type is selected */}
+      {selectedType && onNext && (
+        <div className="flex justify-end pt-4">
+          <Button onClick={onNext} size="lg">
+            Continue
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

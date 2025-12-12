@@ -39,6 +39,7 @@ export function StepRenderer({
       <CategorySelectionStep
         selectedType={sellerType}
         onSelect={(type) => onChange("sellerType", type)}
+        onNext={onNext}
       />
     );
   }
