@@ -71,8 +71,12 @@ async function getAuthToken(): Promise<string> {
   return cachedToken;
 }
 
-async function initiatePayment(token: string, payload: PaymentRequest) {
-  console.log("Initiating ClickPesa USSD-PUSH payment...", { 
+/**
+ * Step 1: Preview/Validate USSD-PUSH Request
+ * Validates payment details and verifies payment method availability
+ */
+async function validatePayment(token: string, payload: PaymentRequest) {
+  console.log("Validating ClickPesa payment details...", { 
     amount: payload.amount, 
     network: payload.network,
     reference: payload.reference 
@@ -96,7 +100,43 @@ async function initiatePayment(token: string, payload: PaymentRequest) {
 
   if (!response.ok) {
     const error = await response.text();
-    console.error("ClickPesa payment error:", error);
+    console.error("ClickPesa validation error:", error);
+    throw new Error(`Payment validation failed: ${error}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Step 2: Initiate USSD-PUSH Request
+ * Sends the USSD-PUSH request to customer's mobile device
+ */
+async function initiatePayment(token: string, payload: PaymentRequest) {
+  console.log("Initiating ClickPesa USSD-PUSH payment...", { 
+    amount: payload.amount, 
+    network: payload.network,
+    reference: payload.reference 
+  });
+
+  const response = await fetch("https://api.clickpesa.com/third-parties/ussd-push", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": token,
+    },
+    body: JSON.stringify({
+      amount: payload.amount,
+      currency: payload.currency || "TZS",
+      phone_number: payload.phone_number,
+      network: payload.network,
+      reference: payload.reference,
+      description: payload.description,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("ClickPesa payment initiation error:", error);
     throw new Error(`Payment initiation failed: ${error}`);
   }
 
@@ -106,7 +146,13 @@ async function initiatePayment(token: string, payload: PaymentRequest) {
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      }
+    });
   }
 
   try {
@@ -142,7 +188,8 @@ serve(async (req) => {
     console.log("ClickPesa payment action:", action);
 
     switch (action) {
-      case "initiate": {
+      case "validate": {
+        // Step 1: Validate payment details (Preview USSD-PUSH Request)
         try {
           // Validate required fields
           if (!payload.amount || !payload.phone_number || !payload.network || !payload.reference) {
@@ -156,6 +203,50 @@ serve(async (req) => {
           }
 
           const clickpesaToken = await getAuthToken();
+          const result = await validatePayment(clickpesaToken, payload as PaymentRequest);
+          
+          return new Response(JSON.stringify({ success: true, data: result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (validationError: unknown) {
+          const errorMessage = validationError instanceof Error ? validationError.message : "Unknown validation error";
+          console.error("Payment validation error:", errorMessage);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: errorMessage,
+              details: validationError instanceof Error ? validationError.stack : undefined
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      case "initiate": {
+        // Step 2: Initiate USSD-PUSH Request
+        try {
+          // Validate required fields
+          if (!payload.amount || !payload.phone_number || !payload.network || !payload.reference) {
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: "Missing required payment fields: amount, phone_number, network, or reference" 
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const clickpesaToken = await getAuthToken();
+          
+          // First validate, then initiate
+          try {
+            await validatePayment(clickpesaToken, payload as PaymentRequest);
+            console.log("Payment validation successful, proceeding with initiation...");
+          } catch (validationError) {
+            console.warn("Validation failed, but proceeding with initiation:", validationError);
+            // Some implementations may skip validation, so we continue
+          }
+          
           const result = await initiatePayment(clickpesaToken, payload as PaymentRequest);
           
           // Store the transaction in the database (non-blocking)
@@ -202,60 +293,115 @@ serve(async (req) => {
       }
 
       case "check-status": {
-        const clickpesaToken = await getAuthToken();
-        const { transaction_id, reference } = payload;
+        // Step 3: Check Payment Status
+        try {
+          const clickpesaToken = await getAuthToken();
+          const { transaction_id, reference } = payload;
 
-        const response = await fetch(
-          `https://api.clickpesa.com/third-parties/transactions/${transaction_id}`,
-          {
-            headers: {
-              "Authorization": clickpesaToken,
-            },
-          }
-        );
-
-        const result = await response.json();
-        
-        // Update transaction status in database if reference provided
-        if (reference && result.status) {
-          const newStatus = result.status === "COMPLETED" ? "completed" 
-            : result.status === "FAILED" ? "failed" 
-            : result.status === "CANCELLED" ? "cancelled" 
-            : "processing";
-
-          const { error: updateError } = await supabase
-            .from("payment_transactions")
-            .update({ 
-              status: newStatus,
-              clickpesa_reference: transaction_id,
-            })
-            .eq("reference", reference)
-            .eq("user_id", user.id);
-
-          if (updateError) {
-            console.error("Error updating transaction status:", updateError);
+          if (!transaction_id && !reference) {
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: "Missing required field: transaction_id or reference" 
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
           }
 
-          // If payment completed, update order status
-          if (newStatus === "completed") {
+          // Use transaction_id if provided, otherwise try to find it from reference
+          let transactionId = transaction_id;
+          if (!transactionId && reference) {
             const { data: txData } = await supabase
               .from("payment_transactions")
-              .select("order_id")
+              .select("clickpesa_reference")
               .eq("reference", reference)
+              .eq("user_id", user.id)
               .single();
-
-            if (txData?.order_id) {
-              await supabase
-                .from("orders")
-                .update({ status: "confirmed" })
-                .eq("id", txData.order_id);
+            
+            if (txData?.clickpesa_reference) {
+              transactionId = txData.clickpesa_reference;
             }
           }
-        }
 
-        return new Response(JSON.stringify({ success: true, data: result }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+          if (!transactionId) {
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: "Transaction ID not found" 
+              }),
+              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const response = await fetch(
+            `https://api.clickpesa.com/third-parties/transactions/${transactionId}`,
+            {
+              headers: {
+                "Authorization": clickpesaToken,
+              },
+            }
+          );
+
+          if (!response.ok) {
+            const error = await response.text();
+            console.error("ClickPesa status check error:", error);
+            throw new Error(`Failed to check payment status: ${error}`);
+          }
+
+          const result = await response.json();
+          
+          // Update transaction status in database if reference provided
+          if (reference && result.status) {
+            const newStatus = result.status === "COMPLETED" ? "completed" 
+              : result.status === "FAILED" ? "failed" 
+              : result.status === "CANCELLED" ? "cancelled" 
+              : "processing";
+
+            const { error: updateError } = await supabase
+              .from("payment_transactions")
+              .update({ 
+                status: newStatus,
+                clickpesa_reference: transactionId,
+              })
+              .eq("reference", reference)
+              .eq("user_id", user.id);
+
+            if (updateError) {
+              console.error("Error updating transaction status:", updateError);
+            }
+
+            // If payment completed, update order status
+            if (newStatus === "completed") {
+              const { data: txData } = await supabase
+                .from("payment_transactions")
+                .select("order_id")
+                .eq("reference", reference)
+                .single();
+
+              if (txData?.order_id) {
+                await supabase
+                  .from("orders")
+                  .update({ status: "confirmed" })
+                  .eq("id", txData.order_id);
+              }
+            }
+          }
+
+          return new Response(JSON.stringify({ success: true, data: result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (statusError: unknown) {
+          const errorMessage = statusError instanceof Error ? statusError.message : "Unknown status check error";
+          console.error("Payment status check error:", errorMessage);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: errorMessage,
+              details: statusError instanceof Error ? statusError.stack : undefined
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
 
       default:
