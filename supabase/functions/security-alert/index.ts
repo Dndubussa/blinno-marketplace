@@ -11,9 +11,11 @@ const getCorsHeaders = (origin?: string | null) => {
     "http://localhost:3000",
   ];
   
-  const allowedOrigin = origin && allowedOrigins.includes(origin) 
-    ? origin 
-    : allowedOrigins[0]; // Default to production origin
+  // Safely check if origin is in allowed list
+  let allowedOrigin = allowedOrigins[0]; // Default to production origin
+  if (origin && typeof origin === "string" && allowedOrigins.includes(origin)) {
+    allowedOrigin = origin;
+  }
   
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
@@ -78,16 +80,29 @@ serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests FIRST - absolutely before anything else
   // This MUST be the very first thing checked, before any other processing
   if (req.method === "OPTIONS") {
-    // Return 204 immediately with CORS headers - no try-catch needed for simple response
-    const origin = req.headers.get("origin");
-    const corsHeaders = getCorsHeaders(origin);
-    return new Response(null, { 
-      status: 204,
-      headers: {
-        ...corsHeaders,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      }
-    });
+    // Return 204 immediately with CORS headers - use try-catch to ensure it always succeeds
+    try {
+      const origin = req.headers.get("origin");
+      const corsHeaders = getCorsHeaders(origin);
+      return new Response(null, { 
+        status: 204,
+        headers: {
+          ...corsHeaders,
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+        }
+      });
+    } catch (error) {
+      // Even if there's an error, return 204 for OPTIONS
+      console.error("Error in OPTIONS handler:", error);
+      return new Response(null, { 
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        }
+      });
+    }
   }
 
   const origin = req.headers.get("origin");

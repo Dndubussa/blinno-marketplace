@@ -401,7 +401,10 @@ serve(async (req) => {
           if (!payload.amount && payload.amount !== 0) missingFields.push("amount");
           if (!payload.reference) missingFields.push("reference");
           if (!payload.redirect_url) missingFields.push("redirect_url");
-          if (!payload.customer?.email) missingFields.push("customer.email");
+          
+          // Check for email in different possible locations
+          const email = payload.email || payload.customer?.email || user?.email;
+          if (!email) missingFields.push("email");
 
           if (missingFields.length > 0) {
             console.error("Missing required fields:", missingFields);
@@ -428,6 +431,21 @@ serve(async (req) => {
             );
           }
 
+          // Get customer email and name from various possible locations
+          const customerEmail = payload.email || payload.customer?.email || user?.email || "";
+          const customerName = payload.name || payload.customer?.name || user?.user_metadata?.full_name || "Blinno Customer";
+
+          if (!customerEmail) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: "Customer email is required",
+                message: "Customer email is required",
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
           // Initiate checkout
           const result = await initiateCheckout({
             amount: amount,
@@ -435,8 +453,8 @@ serve(async (req) => {
             reference: String(payload.reference).trim(),
             description: payload.description || "Blinno Subscription",
             customer: {
-              email: payload.customer.email,
-              name: payload.customer.name || "Blinno Customer",
+              email: customerEmail,
+              name: customerName,
             },
             redirect_url: String(payload.redirect_url).trim(),
             meta: payload.meta || {},
