@@ -423,10 +423,12 @@ serve(async (req) => {
       statusCode = 400;
     }
     
+    // Return error response with proper structure
     return new Response(
       JSON.stringify({ 
         success: false, 
         error: errorMessage,
+        message: errorMessage, // Also include as 'message' for compatibility
         // Only include stack in development
         ...(Deno.env.get("ENVIRONMENT") === "development" ? { stack: errorStack } : {})
       }),

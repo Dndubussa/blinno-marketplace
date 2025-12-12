@@ -453,8 +453,42 @@ export default function Onboarding() {
         },
       });
 
+      // Handle Edge Function errors (non-2xx status codes)
       if (error) {
-        throw new Error(error.message || "Failed to connect to payment service");
+        console.error("ClickPesa Edge Function error:", error);
+        
+        // Parse error message from Edge Function response
+        let errorMessage = "Failed to connect to payment service";
+        
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.context?.message) {
+          errorMessage = error.context.message;
+        } else if (typeof error === 'object' && 'error' in error) {
+          errorMessage = String(error.error);
+        }
+        
+        // Check for specific error types
+        if (errorMessage.includes("credentials not configured") || errorMessage.includes("CLICKPESA_CLIENT_ID")) {
+          errorMessage = "Payment service is not configured. Please contact support.";
+        } else if (errorMessage.includes("Unauthorized") || errorMessage.includes("401")) {
+          errorMessage = "Authentication failed. Please try again or contact support.";
+        } else if (errorMessage.includes("Missing required")) {
+          errorMessage = "Payment information is incomplete. Please check your phone number and network selection.";
+        } else if (errorMessage.includes("Invalid phone number") || errorMessage.includes("phone")) {
+          errorMessage = "Invalid phone number format. Please use format: +255 XXX XXX XXX or 0XXX XXX XXX";
+        } else if (errorMessage.includes("Failed to authenticate with ClickPesa")) {
+          errorMessage = "Payment service authentication failed. Please contact support.";
+        } else if (errorMessage.includes("Payment validation failed") || errorMessage.includes("Payment initiation failed")) {
+          errorMessage = "Payment could not be processed. Please verify your phone number and try again.";
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Check if payment was successful
+      if (!paymentData) {
+        throw new Error("No response from payment service. Please try again.");
       }
 
       if (paymentData?.success) {
@@ -469,12 +503,28 @@ export default function Onboarding() {
 
         setIsProcessingPayment(false);
       } else {
-        throw new Error(paymentData?.error || "Payment failed");
+        // Payment failed - extract error message
+        const errorMsg = paymentData?.error || paymentData?.message || "Payment failed";
+        console.error("ClickPesa payment failed:", paymentData);
+        throw new Error(errorMsg);
       }
     } catch (error: any) {
+      console.error("Payment error:", error);
+      
+      // Extract user-friendly error message
+      let errorMessage = "Could not process payment. Please try again.";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.error) {
+        errorMessage = String(error.error);
+      }
+      
       toast({
         title: "Payment failed",
-        description: error.message || "Could not process payment. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       setPaymentStatus("failed");
