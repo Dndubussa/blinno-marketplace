@@ -21,7 +21,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { StepRenderer } from "@/components/onboarding/StepRenderer";
-import { getStepConfig, validateStep, type StepId } from "@/lib/onboardingSteps";
+import { getStepConfig, validateStep, getOrderedSteps, type StepId } from "@/lib/onboardingSteps";
 import type { SellerType } from "@/lib/sellerTypes";
 import type { StepConfig } from "@/lib/onboardingSteps";
 
@@ -133,23 +133,27 @@ export default function Onboarding() {
   // Initialize seller steps when seller type is selected or status is loaded
   useEffect(() => {
     if (data.role === "seller" && !onboardingLoading) {
-      const stepIds = getSteps();
-      
-      if (stepIds.length > 0) {
-        // Convert step IDs to StepConfig objects
-        const stepConfigs = stepIds
-          .map((stepId) => getStepConfig(stepId as StepId))
-          .filter((config) => config !== undefined) as StepConfig[];
-        
-        setSellerSteps(stepConfigs);
-        
-        // If user already has seller type, set it
-        if (onboardingStatus?.sellerType && !data.sellerType) {
-          setData((prev) => ({ ...prev, sellerType: onboardingStatus.sellerType }));
+      // If user already has seller type from database, use it
+      if (onboardingStatus?.sellerType && !data.sellerType) {
+        setData((prev) => ({ ...prev, sellerType: onboardingStatus.sellerType }));
+        // Load steps for existing seller type
+        const steps = getOrderedSteps(onboardingStatus.sellerType, false);
+        setSellerSteps(steps);
+      } else if (data.sellerType) {
+        // If seller type is already selected in local state, ensure steps are loaded
+        if (sellerSteps.length === 0) {
+          const steps = getOrderedSteps(data.sellerType, false);
+          setSellerSteps(steps);
+        }
+      } else {
+        // New seller - start with just category step
+        const categoryStep = getStepConfig("category");
+        if (categoryStep) {
+          setSellerSteps([categoryStep]);
         }
       }
     }
-  }, [data.role, onboardingLoading, onboardingStatus, getSteps]);
+  }, [data.role, data.sellerType, onboardingLoading, onboardingStatus]);
 
   // Handle role selection
   const handleRoleSelect = (role: Role) => {
@@ -204,12 +208,9 @@ export default function Onboarding() {
     
     // Special handling for seller type selection
     if (fieldId === "sellerType" && value) {
-      // Reload steps for the selected seller type
-      const stepIds = getSteps();
-      const stepConfigs = stepIds
-        .map((stepId) => getStepConfig(stepId as StepId))
-        .filter((config) => config !== undefined) as StepConfig[];
-      setSellerSteps(stepConfigs);
+      // Reload steps for the selected seller type using the selected type directly
+      const steps = getOrderedSteps(value, false); // false = only required steps
+      setSellerSteps(steps);
       setSellerStepIndex(0);
     }
   };
@@ -303,7 +304,9 @@ export default function Onboarding() {
 
   const handleSellerNext = useCallback(async () => {
     const currentStep = sellerSteps[sellerStepIndex];
-    if (!currentStep) return;
+    if (!currentStep) {
+      return;
+    }
 
     // Special handling for payment step - PaymentStep component handles its own buttons
     // This function should only be called for percentage plans (via onComplete)
@@ -320,15 +323,28 @@ export default function Onboarding() {
       return;
     }
 
-    // Validate current step
-    const validation = validateStep(currentStep.id, data);
-    if (!validation.valid) {
-      toast({
-        title: "Validation Error",
-        description: validation.errors.join(", "),
-        variant: "destructive",
-      });
-      return;
+    // Special handling for category step - just check if sellerType is selected
+    if (currentStep.id === "category") {
+      if (!data.sellerType) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a seller type",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Category step has no fields, so we can skip field validation
+    } else {
+      // Validate current step
+      const validation = validateStep(currentStep.id, data);
+      if (!validation.valid) {
+        toast({
+          title: "Validation Error",
+          description: validation.errors.join(", "),
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // Mark step as completed

@@ -72,9 +72,20 @@ export function CategorySelectionStep({ selectedType, onSelect, onNext }: Catego
       </div>
 
       {/* Continue button - only shows when a type is selected */}
-      {selectedType && onNext && (
+      {selectedType && (
         <div className="flex justify-end pt-4">
-          <Button onClick={onNext} size="lg">
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onNext) {
+                onNext();
+              }
+            }} 
+            size="lg"
+            type="button"
+            disabled={!selectedType || !onNext}
+          >
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
