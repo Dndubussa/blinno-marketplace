@@ -186,6 +186,7 @@ serve(async (req) => {
     const { action, ...payload } = await req.json();
 
     console.log("ClickPesa payment action:", action);
+    console.log("Payment payload received:", JSON.stringify(payload, null, 2));
 
     switch (action) {
       case "validate": {
@@ -225,29 +226,95 @@ serve(async (req) => {
       case "initiate": {
         // Step 2: Initiate USSD-PUSH Request
         try {
-          // Validate required fields
-          if (!payload.amount || !payload.phone_number || !payload.network || !payload.reference) {
+          // Validate required fields with detailed logging
+          const missingFields: string[] = [];
+          if (!payload.amount && payload.amount !== 0) missingFields.push("amount");
+          if (!payload.phone_number) missingFields.push("phone_number");
+          if (!payload.network) missingFields.push("network");
+          if (!payload.reference) missingFields.push("reference");
+
+          if (missingFields.length > 0) {
+            console.error("Missing required fields:", missingFields);
+            console.error("Payload received:", JSON.stringify(payload, null, 2));
             return new Response(
               JSON.stringify({ 
                 success: false, 
-                error: "Missing required payment fields: amount, phone_number, network, or reference" 
+                error: `Missing required payment fields: ${missingFields.join(", ")}`,
+                message: `Missing required payment fields: ${missingFields.join(", ")}`,
+                received: payload
               }),
               { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
+          // Validate amount is a positive number
+          const amount = Number(payload.amount);
+          if (isNaN(amount) || amount <= 0) {
+            console.error("Invalid amount:", payload.amount, "Type:", typeof payload.amount);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: `Invalid amount: ${payload.amount}. Amount must be a positive number`,
+                message: `Invalid amount: ${payload.amount}. Amount must be a positive number`
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Validate phone number format (should be 12 digits starting with 255)
+          const phoneNumber = String(payload.phone_number).trim();
+          if (!/^255\d{9}$/.test(phoneNumber)) {
+            console.error("Invalid phone number format:", phoneNumber);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: `Invalid phone number format: ${phoneNumber}. Expected format: 255XXXXXXXXX (12 digits)`,
+                message: `Invalid phone number format. Expected format: 255XXXXXXXXX (12 digits)`
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Validate network (must be one of the allowed values)
+          const validNetworks = ["MPESA", "TIGOPESA", "AIRTELMONEY", "HALOPESA"];
+          const network = String(payload.network).toUpperCase().trim();
+          if (!validNetworks.includes(network)) {
+            console.error("Invalid network:", payload.network);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: `Invalid network: ${payload.network}. Must be one of: ${validNetworks.join(", ")}`,
+                message: `Invalid network. Must be one of: ${validNetworks.join(", ")}`
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Normalize payload
+          const normalizedPayload: PaymentRequest = {
+            amount: amount,
+            currency: payload.currency || "TZS",
+            phone_number: phoneNumber,
+            network: network as PaymentRequest["network"],
+            reference: String(payload.reference).trim(),
+            description: payload.description || "",
+            order_id: payload.order_id || undefined,
+          };
+
+          console.log("Normalized payment payload:", JSON.stringify(normalizedPayload, null, 2));
+
           const clickpesaToken = await getAuthToken();
           
           // First validate, then initiate
           try {
-            await validatePayment(clickpesaToken, payload as PaymentRequest);
+            await validatePayment(clickpesaToken, normalizedPayload);
             console.log("Payment validation successful, proceeding with initiation...");
           } catch (validationError) {
             console.warn("Validation failed, but proceeding with initiation:", validationError);
             // Some implementations may skip validation, so we continue
           }
           
-          const result = await initiatePayment(clickpesaToken, payload as PaymentRequest);
+          const result = await initiatePayment(clickpesaToken, normalizedPayload);
           
           // Store the transaction in the database (non-blocking)
           try {
@@ -255,15 +322,15 @@ serve(async (req) => {
               .from("payment_transactions")
               .insert({
                 user_id: user.id,
-                order_id: payload.order_id || null,
-                amount: payload.amount,
-                currency: payload.currency || "TZS",
-                network: payload.network,
-                phone_number: payload.phone_number,
-                reference: payload.reference,
+                order_id: normalizedPayload.order_id || null,
+                amount: normalizedPayload.amount,
+                currency: normalizedPayload.currency,
+                network: normalizedPayload.network,
+                phone_number: normalizedPayload.phone_number,
+                reference: normalizedPayload.reference,
                 clickpesa_reference: result.transaction_id || result.reference || null,
                 status: "pending",
-                description: payload.description,
+                description: normalizedPayload.description,
               });
 
             if (txError) {

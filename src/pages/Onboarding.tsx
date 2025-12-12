@@ -413,6 +413,11 @@ export default function Onboarding() {
           ? subscriptionPrices[selectedPlan] || 0
           : percentagePrices[selectedPlan] || 0;
 
+      // Validate plan price is valid
+      if (!planPrice || planPrice <= 0) {
+        throw new Error(`Invalid plan selected: ${selectedPlan}. Please select a valid subscription plan.`);
+      }
+
       // Format phone number for ClickPesa (ensure it starts with 255)
       // ClickPesa requires format: 255XXXXXXXXX (no +, no spaces)
       let formattedPhone = data.phoneNumber.replace(/\D/g, ""); // Remove all non-digits
@@ -429,7 +434,14 @@ export default function Onboarding() {
 
       // Validate phone number format (should be 12 digits: 255 + 9 digits)
       if (formattedPhone.length !== 12 || !formattedPhone.startsWith("255")) {
-        throw new Error("Invalid phone number format. Please use format: +255 XXX XXX XXX or 0XXX XXX XXX");
+        throw new Error(`Invalid phone number format: ${data.phoneNumber}. Please use format: +255 XXX XXX XXX or 0XXX XXX XXX`);
+      }
+
+      // Validate network is selected
+      const network = (data.paymentNetwork || "").toUpperCase().trim();
+      const validNetworks = ["MPESA", "TIGOPESA", "AIRTELMONEY", "HALOPESA"];
+      if (!validNetworks.includes(network)) {
+        throw new Error(`Invalid payment network: ${data.paymentNetwork}. Please select a valid network.`);
       }
 
       const reference = `SUB-${user?.id?.slice(0, 8)}-${Date.now()}`;
@@ -441,16 +453,21 @@ export default function Onboarding() {
         reference,
       });
 
+      // Prepare payment payload
+      const paymentPayload = {
+        action: "initiate",
+        amount: planPrice,
+        currency: "TZS",
+        phone_number: formattedPhone, // Use formatted phone number
+        network: network, // Use validated and normalized network
+        reference: reference,
+        description: `Blinno ${selectedPlan} Plan Subscription`,
+      };
+
+      console.log("Sending payment request:", JSON.stringify(paymentPayload, null, 2));
+
       const { data: paymentData, error } = await supabase.functions.invoke("clickpesa-payment", {
-        body: {
-          action: "initiate",
-          amount: planPrice,
-          currency: "TZS",
-          phone_number: formattedPhone, // Use formatted phone number
-          network: data.paymentNetwork || "MPESA",
-          reference: reference,
-          description: `Blinno ${selectedPlan} Plan Subscription`,
-        },
+        body: paymentPayload,
       });
 
       // Handle Edge Function errors (non-2xx status codes)
