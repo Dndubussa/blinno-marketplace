@@ -112,7 +112,7 @@ export default function SignUp() {
       localStorage.setItem("blinno_new_user_signup", "true");
       toast({
         title: "Verify your email",
-        description: "We've sent you a verification code.",
+        description: "We've sent you a verification link. Click it to verify your account.",
       });
       navigate("/verify-email", { state: { email: data.email, role: data.role } });
     }
