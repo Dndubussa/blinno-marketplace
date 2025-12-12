@@ -48,7 +48,7 @@ const buyerInterests = [
 ];
 
 export default function Onboarding() {
-  const { user, loading, becomeSeller } = useAuth();
+  const { user, loading, becomeSeller, roles: userRoles } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -74,7 +74,6 @@ export default function Onboarding() {
 
   // Get role from location state (if coming from email verification or direct navigation)
   const roleFromState = location.state?.role as Role | undefined;
-  const { roles: userRoles } = useAuth();
 
   // Determine initial role: prioritize userRoles from database, then location state, then user metadata
   const getInitialRole = (): Role | null => {
@@ -108,6 +107,14 @@ export default function Onboarding() {
     interests: [],
     sellerType: null,
   });
+
+  // If user already has roles but data.role is null, update it
+  useEffect(() => {
+    if (!data.role && userRoles && userRoles.length > 0) {
+      const roleToSet = userRoles.includes("seller") ? "seller" : (userRoles.includes("buyer") ? "buyer" : userRoles[0] as Role);
+      setData((prev) => ({ ...prev, role: roleToSet }));
+    }
+  }, [userRoles, data.role]);
 
   // Check for OAuth errors in URL
   useEffect(() => {
