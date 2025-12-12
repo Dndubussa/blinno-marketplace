@@ -349,8 +349,12 @@ export default function Onboarding() {
     }
 
     // Mark step as completed
+    // For category step, include sellerType in stepData so it's saved to database
     if (user?.id) {
-      await completeStep(currentStep.id, data);
+      const stepData = currentStep.id === "category" && data.sellerType
+        ? { ...data, sellerType: data.sellerType }
+        : data;
+      await completeStep(currentStep.id, stepData);
     }
 
     // Check if this is the last step

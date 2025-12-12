@@ -205,14 +205,37 @@ export async function markStepCompleted(
       [stepId]: stepData || {},
     };
 
+    // Extract seller_type from stepData if this is the category step
+    let sellerType: SellerType | undefined = undefined;
+    if (stepId === "category" && stepData?.sellerType) {
+      sellerType = stepData.sellerType as SellerType;
+    } else if (stepData?.sellerType) {
+      // Also check if sellerType is in stepData for other steps
+      sellerType = stepData.sellerType as SellerType;
+    } else if (currentOnboardingData.sellerType) {
+      // Preserve existing seller_type
+      sellerType = currentOnboardingData.sellerType as SellerType;
+    } else if (sellerProfile?.seller_type) {
+      // Use existing seller_type from database
+      sellerType = sellerProfile.seller_type as SellerType;
+    }
+
+    // Prepare upsert data
+    const upsertData: any = {
+      user_id: userId,
+      onboarding_data: updatedOnboardingData,
+      onboarding_completed: false, // Will be set to true when all steps are done
+    };
+
+    // Set seller_type if we have it (especially important for category step)
+    if (sellerType) {
+      upsertData.seller_type = sellerType;
+    }
+
     // Update seller profile
     const { error } = await supabase
       .from("seller_profiles")
-      .upsert({
-        user_id: userId,
-        onboarding_data: updatedOnboardingData,
-        onboarding_completed: false, // Will be set to true when all steps are done
-      }, {
+      .upsert(upsertData, {
         onConflict: "user_id",
       });
 
