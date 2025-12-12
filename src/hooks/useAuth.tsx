@@ -164,60 +164,108 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let isInitialLoad = true;
+    let lastUserId: string | null = null;
+    let hasProfileForUser = false;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        const currentUserId = session?.user?.id || null;
+
+        // Handle TOKEN_REFRESHED event - don't refetch profile/roles unnecessarily
+        // Token refresh happens automatically when tab becomes visible - don't reload!
+        if (event === "TOKEN_REFRESHED") {
+          // Only verify user exists if we don't already have their profile
+          // Don't refetch profile/roles on token refresh - they haven't changed
+          if (session?.user) {
+            // Only check if user was deleted if we don't have profile data
+            if (!hasProfileForUser || currentUserId !== lastUserId) {
+              const { data: authUser, error: authError } = await supabase.auth.getUser();
+              if (authError || !authUser?.user) {
+                // User was deleted - clear everything
+                setProfile(null);
+                setRoles([]);
+                setUser(null);
+                setSession(null);
+                lastUserId = null;
+                hasProfileForUser = false;
+                toast({
+                  title: "Account Deleted",
+                  description: "Your account has been deleted. You have been signed out.",
+                  variant: "destructive",
+                });
+                setLoading(false);
+                return;
+              }
+              // Only fetch if we don't have the profile for this user
+              if (!hasProfileForUser) {
+                lastUserId = currentUserId;
+                fetchProfile(currentUserId);
+                fetchRoles(currentUserId);
+              }
+            }
+          }
+          // Update session silently - don't trigger UI reload
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+          return; // Exit early - don't process further
+        }
+
+        // Handle SIGNED_OUT
+        if (event === "SIGNED_OUT") {
+          setProfile(null);
+          setRoles([]);
+          setUser(null);
+          setSession(null);
+          lastUserId = null;
+          hasProfileForUser = false;
+          setLoading(false);
+          return;
+        }
+
+        // Handle SIGNED_IN or other events
         setSession(session);
         setUser(session?.user ?? null);
 
-        // Handle user deletion or token revocation
-        if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
-          // Verify user still exists when token is refreshed
-          if (event === "TOKEN_REFRESHED" && session?.user) {
-            const { data: authUser, error: authError } = await supabase.auth.getUser();
-            if (authError || !authUser?.user) {
-              // User was deleted - clear everything
-              setProfile(null);
-              setRoles([]);
-              setUser(null);
-              setSession(null);
-              toast({
-                title: "Account Deleted",
-                description: "Your account has been deleted. You have been signed out.",
-                variant: "destructive",
-              });
-              setLoading(false);
-              return;
-            }
-          } else {
-            // Normal sign out
-            setProfile(null);
-            setRoles([]);
-          }
-        }
-
-        // Defer fetching profile and roles with setTimeout to prevent deadlock
+        // Only fetch profile/roles if:
+        // 1. User exists
+        // 2. It's a new user (different from last user) OR it's initial load
         if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-            fetchRoles(session.user.id);
-          }, 0);
-
-          // Send login security alert for SIGNED_IN event
-          if (event === "SIGNED_IN") {
+          const isNewUser = currentUserId !== lastUserId;
+          
+          if (isNewUser || isInitialLoad) {
+            lastUserId = currentUserId;
+            hasProfileForUser = false;
+            isInitialLoad = false;
+            
+            // Defer fetching profile and roles with setTimeout to prevent deadlock
             setTimeout(() => {
-              sendSecurityAlert({
-                email: session.user.email || "",
-                alertType: "login",
-                userName: session.user.user_metadata?.full_name,
-                deviceInfo: getDeviceInfo(),
-                timestamp: new Date().toLocaleString(),
-              }).catch(console.error);
+              fetchProfile(session.user.id).then(() => {
+                hasProfileForUser = true;
+              });
+              fetchRoles(session.user.id);
             }, 0);
+
+            // Send login security alert for SIGNED_IN event only
+            if (event === "SIGNED_IN") {
+              setTimeout(() => {
+                sendSecurityAlert({
+                  email: session.user.email || "",
+                  alertType: "login",
+                  userName: session.user.user_metadata?.full_name,
+                  deviceInfo: getDeviceInfo(),
+                  timestamp: new Date().toLocaleString(),
+                }).catch(console.error);
+              }, 0);
+            }
           }
         } else {
           setProfile(null);
           setRoles([]);
+          lastUserId = null;
+          hasProfileForUser = false;
         }
         setLoading(false);
       }
@@ -228,32 +276,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        lastUserId = session.user.id;
+        hasProfileForUser = false;
+        fetchProfile(session.user.id).then(() => {
+          hasProfileForUser = true;
+        });
         fetchRoles(session.user.id);
       }
       setLoading(false);
+      isInitialLoad = false;
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   // Handle tab visibility changes - prevent unnecessary refetches
+  // This effect is intentionally minimal - Supabase handles token refresh automatically
+  // We don't need to do anything on visibility change to prevent reloads
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // When tab becomes visible, only refresh if session is about to expire
-      // Don't refetch profile/roles unnecessarily
-      if (!document.hidden && session?.user) {
-        // Check if token needs refresh (Supabase handles this automatically)
-        // We don't need to manually refetch here
-        // Supabase auth state listener will handle token refresh
-      }
+      // Do nothing on visibility change - Supabase will handle token refresh silently
+      // The TOKEN_REFRESHED event handler above prevents unnecessary refetches
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [session]);
+  }, []);
 
   const signUp = async (email: string, password: string, fullName: string, intendedRole?: "buyer" | "seller") => {
     const redirectUrl = `${window.location.origin}/verify-email?verified=true`;

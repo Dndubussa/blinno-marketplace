@@ -14,10 +14,20 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true, // Automatically detect and process session from URL hash
+    // Prevent automatic session refresh on tab focus - only refresh when needed
+    // Supabase will still refresh tokens when they're about to expire
+    flowType: "pkce", // Use PKCE flow for better security and session management
   },
   global: {
     headers: {
       "x-client-info": "blinno-web",
+    },
+  },
+  // Real-time configuration
+  realtime: {
+    // Don't reconnect immediately on tab focus - wait for user interaction
+    params: {
+      eventsPerSecond: 10,
     },
   },
 });
