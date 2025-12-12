@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -12,6 +12,8 @@ import { User, ShoppingBag } from "lucide-react";
 export default function Profile() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "profile";
 
   useEffect(() => {
     if (!loading && !user) {
@@ -59,7 +61,17 @@ export default function Profile() {
         </section>
 
         <div className="container mx-auto max-w-4xl px-4 py-8 lg:px-8">
-          <Tabs defaultValue="profile" className="space-y-6">
+          <Tabs 
+            value={activeTab} 
+            onValueChange={(value) => {
+              if (value === "profile") {
+                setSearchParams({});
+              } else {
+                setSearchParams({ tab: value });
+              }
+            }}
+            className="space-y-6"
+          >
             <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-grid">
               <TabsTrigger value="profile" className="gap-2">
                 <User className="h-4 w-4" />

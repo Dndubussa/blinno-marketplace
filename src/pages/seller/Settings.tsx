@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Save, User, Store, Bell, Shield, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,12 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 
 export default function Settings() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const { userCurrency, setUserCurrency } = useCurrency();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "profile";
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || "",
@@ -75,7 +77,17 @@ export default function Settings() {
         </p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      <Tabs 
+        value={activeTab} 
+        onValueChange={(value) => {
+          if (value === "profile") {
+            setSearchParams({});
+          } else {
+            setSearchParams({ tab: value });
+          }
+        }}
+        className="space-y-6"
+      >
         <TabsList>
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
