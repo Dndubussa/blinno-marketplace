@@ -259,7 +259,7 @@ export default function BuyerPayments() {
           <div>
             <CardTitle>Transaction History</CardTitle>
             <CardDescription>
-              Your recent ClickPesa payment transactions
+              Your recent Flutterwave payment transactions
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={fetchTransactions} disabled={isLoading}>
