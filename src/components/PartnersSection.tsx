@@ -9,7 +9,7 @@ import visa from "@/assets/partners/visa.png";
 
 const partners = [
   { name: "M-Pesa", logo: mpesa, size: "large" }, // Twice the size
-  { name: "Visa", logo: visa, size: "normal" },
+  { name: "Visa", logo: visa, size: "small" }, // Reduced once
   { name: "Mastercard", logo: mastercard, size: "normal" },
   { name: "Airtel Money", logo: airtelMoney, size: "medium" }, // Once (slightly larger)
   { name: "Halopesa", logo: halopesa, size: "normal" },
@@ -62,10 +62,11 @@ export function PartnersSection() {
               large: "h-24 w-auto max-w-[280px]", // Twice the size (2x)
               medium: "h-16 w-auto max-w-[180px]", // Once (1.33x)
               normal: "h-12 w-auto max-w-[140px]", // Default size
+              small: "h-10 w-auto max-w-[120px]", // Reduced once
             };
             
-            const size = (partner as typeof partner & { size?: "large" | "medium" | "normal" }).size || "normal";
-            const containerHeight = size === "large" ? "h-28" : size === "medium" ? "h-20" : "h-16";
+            const size = (partner as typeof partner & { size?: "large" | "medium" | "normal" | "small" }).size || "normal";
+            const containerHeight = size === "large" ? "h-28" : size === "medium" ? "h-20" : size === "small" ? "h-14" : "h-16";
             
             return (
               <div
