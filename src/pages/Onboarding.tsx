@@ -473,7 +473,7 @@ export default function Onboarding() {
 
       const reference = `SUB-${user?.id?.slice(0, 8)}-${Date.now()}`;
 
-      console.log("Initiating ClickPesa payment for subscription:", {
+      console.log("Initiating Flutterwave payment for subscription:", {
         amount: planPrice,
         phone: formattedPhone,
         network: data.paymentNetwork,
@@ -499,7 +499,7 @@ export default function Onboarding() {
 
       // Handle Edge Function errors (non-2xx status codes)
       if (error) {
-        console.error("ClickPesa Edge Function error:", error);
+        console.error("Flutterwave Edge Function error:", error);
         
         // Parse error message from Edge Function response
         let errorMessage = "Failed to connect to payment service";
@@ -513,7 +513,7 @@ export default function Onboarding() {
         }
         
         // Check for specific error types
-        if (errorMessage.includes("credentials not configured") || errorMessage.includes("CLICKPESA_CLIENT_ID")) {
+        if (errorMessage.includes("credentials not configured") || errorMessage.includes("FLUTTERWAVE_SECRET_KEY")) {
           errorMessage = "Payment service is not configured. Please contact support.";
         } else if (errorMessage.includes("Unauthorized") || errorMessage.includes("401")) {
           errorMessage = "Authentication failed. Please try again or contact support.";
@@ -521,7 +521,7 @@ export default function Onboarding() {
           errorMessage = "Payment information is incomplete. Please check your phone number and network selection.";
         } else if (errorMessage.includes("Invalid phone number") || errorMessage.includes("phone")) {
           errorMessage = "Invalid phone number format. Please use format: +255 XXX XXX XXX or 0XXX XXX XXX";
-        } else if (errorMessage.includes("Failed to authenticate with ClickPesa")) {
+        } else if (errorMessage.includes("Failed to authenticate") || errorMessage.includes("Flutterwave")) {
           errorMessage = "Payment service authentication failed. Please contact support.";
         } else if (errorMessage.includes("Payment validation failed") || errorMessage.includes("Payment initiation failed")) {
           errorMessage = "Payment could not be processed. Please verify your phone number and try again.";
@@ -549,7 +549,7 @@ export default function Onboarding() {
       } else {
         // Payment failed - extract error message
         const errorMsg = paymentData?.error || paymentData?.message || "Payment failed";
-        console.error("ClickPesa payment failed:", paymentData);
+        console.error("Flutterwave payment failed:", paymentData);
         throw new Error(errorMsg);
       }
     } catch (error: any) {

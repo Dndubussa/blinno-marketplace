@@ -62,7 +62,7 @@ const mobileNetworks: { id: MobileNetwork; name: string; color: string }[] = [
 import { useCurrency } from "@/hooks/useCurrency";
 import { convertCurrency, formatPrice as formatPriceUtil, Currency } from "@/lib/currency";
 
-// Keep formatPriceTZS for payment processing (ClickPesa requires TZS)
+// Keep formatPriceTZS for payment processing (Flutterwave requires TZS)
 const formatPriceTZS = (price: number) => {
   // Convert USD to TZS (approximate rate)
   const tzsAmount = price * 2500;
@@ -179,7 +179,7 @@ export default function Checkout() {
 
       if (itemsError) throw itemsError;
 
-      // Format phone number for ClickPesa (ensure it starts with 255)
+      // Format phone number for Flutterwave (ensure it starts with 255)
       let formattedPhone = paymentPhone.replace(/\D/g, "");
       if (formattedPhone.startsWith("0")) {
         formattedPhone = "255" + formattedPhone.substring(1);
@@ -221,7 +221,7 @@ export default function Checkout() {
       // Store payment reference and transaction ID for status polling
       setPaymentReference(reference);
       
-      // Store transaction ID from ClickPesa response if available
+      // Store transaction ID from Flutterwave response if available
       const transactionId = paymentResult?.data?.transaction_id || paymentResult?.data?.reference || null;
       if (transactionId) {
         // Store in a ref or state for status checking
