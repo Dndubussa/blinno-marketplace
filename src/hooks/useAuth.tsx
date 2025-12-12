@@ -60,7 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<void> => {
+    // Skip if we already have profile for this user (prevent unnecessary refetches)
+    if (profile && profile.id === userId) {
+      return;
+    }
+
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
