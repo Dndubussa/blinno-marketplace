@@ -4,6 +4,7 @@
  */
 
 import type { SellerType } from "./sellerTypes";
+import { getSellerTypeConfig } from "./sellerTypes";
 
 export type StepId =
   | "category"
@@ -840,7 +841,6 @@ export function getStepConfig(stepId: StepId): StepConfig {
  * Get ordered steps for a seller type
  */
 export function getOrderedSteps(sellerType: SellerType, includeOptional: boolean = false): StepConfig[] {
-  const { getSellerTypeConfig } = require("./sellerTypes");
   const { requiredSteps, optionalSteps } = getSellerTypeConfig(sellerType);
   const allStepIds = includeOptional ? [...requiredSteps, ...optionalSteps] : requiredSteps;
   
