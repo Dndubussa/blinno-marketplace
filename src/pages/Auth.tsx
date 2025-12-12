@@ -79,9 +79,17 @@ export default function Auth() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!loading && user) {
-      const redirectPath = getPostLoginRedirectPath(roles, location.state?.from?.pathname);
-      navigate(redirectPath, { replace: true });
+    if (!loading && user && user.id) {
+      // Ensure roles is an array before calling
+      if (roles && Array.isArray(roles) && roles.length > 0) {
+        getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
+          navigate(redirectPath, { replace: true });
+        }).catch((error) => {
+          console.error("Error getting redirect path:", error);
+          // Fallback to default redirect
+          navigate("/products", { replace: true });
+        });
+      }
     }
   }, [user, loading, roles, navigate, location.state]);
 

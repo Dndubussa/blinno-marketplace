@@ -42,7 +42,7 @@ export default function SignIn() {
   // Handle redirect after successful sign in (once roles are loaded)
   // Consolidated into single useEffect to prevent duplicate redirects
   useEffect(() => {
-    if (!loading && user && roles.length > 0) {
+    if (!loading && user && user.id && roles && Array.isArray(roles) && roles.length > 0) {
       // Only redirect if we just signed in OR if user is already authenticated and not on a protected route
       const shouldRedirect = justSignedIn || (!justSignedIn && location.pathname === "/sign-in");
       
@@ -57,6 +57,13 @@ export default function SignIn() {
             setJustSignedIn(false);
           }
           navigate(redirectPath, { replace: true });
+        }).catch((error) => {
+          console.error("Error getting redirect path:", error);
+          // Fallback to default redirect
+          navigate("/products", { replace: true });
+          if (justSignedIn) {
+            setJustSignedIn(false);
+          }
         });
       }
     }
