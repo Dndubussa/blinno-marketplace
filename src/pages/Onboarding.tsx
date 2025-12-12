@@ -165,11 +165,11 @@ export default function Onboarding() {
     }
   }, [onboardingLoading, onboardingStatus, navigate, toast]);
 
-  // Initialize seller steps only on initial load or when loading from database
+  // Initialize seller steps and load saved data from database
   useEffect(() => {
-    if (data.role === "seller" && !onboardingLoading) {
+    if (data.role === "seller" && !onboardingLoading && onboardingStatus) {
       // If user already has seller type from database, use it (initial load)
-      if (onboardingStatus?.sellerType && !data.sellerType) {
+      if (onboardingStatus.sellerType && !data.sellerType) {
         setData((prev) => ({ ...prev, sellerType: onboardingStatus.sellerType }));
         // Load steps for existing seller type
         const steps = getOrderedSteps(onboardingStatus.sellerType, false);
@@ -182,10 +182,45 @@ export default function Onboarding() {
           setSellerStepIndex(0);
         }
       }
-      // Don't reload steps if sellerType is already set in local state
-      // That's handled by handleSellerFieldChange when user selects a type
+
+      // Load saved pricing data from database if available
+      if (onboardingStatus.pricingModel && !data.pricingModel) {
+        setData((prev) => ({
+          ...prev,
+          pricingModel: onboardingStatus.pricingModel,
+          plan: onboardingStatus.currentPlan || prev.plan,
+        }));
+      }
+
+      // Load saved onboarding data from seller_profiles if available
+      if (user?.id && onboardingStatus.sellerType) {
+        supabase
+          .from("seller_profiles")
+          .select("onboarding_data")
+          .eq("user_id", user.id)
+          .eq("seller_type", onboardingStatus.sellerType)
+          .maybeSingle()
+          .then(({ data: profileData }) => {
+            if (profileData?.onboarding_data) {
+              const savedData = profileData.onboarding_data as Record<string, any>;
+              // Restore pricing data if it exists
+              if (savedData.pricingModel && !data.pricingModel) {
+                setData((prev) => ({
+                  ...prev,
+                  pricingModel: savedData.pricingModel,
+                  plan: savedData.plan || prev.plan,
+                  phoneNumber: savedData.phoneNumber || prev.phoneNumber,
+                  paymentNetwork: savedData.paymentNetwork || prev.paymentNetwork,
+                }));
+              }
+            }
+          })
+          .catch((error) => {
+            console.error("Error loading saved onboarding data:", error);
+          });
+      }
     }
-  }, [data.role, onboardingLoading, onboardingStatus]);
+  }, [data.role, onboardingLoading, onboardingStatus, user?.id, data.sellerType, sellerSteps.length, data.pricingModel]);
 
   // Handle role selection
   const handleRoleSelect = (role: Role) => {
