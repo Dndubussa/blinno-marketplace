@@ -179,15 +179,48 @@ export default function Auth() {
 
   // Handle redirect after successful sign in (once roles are loaded)
   useEffect(() => {
-    if (justSignedIn && !loading && user && roles.length > 0) {
-      getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
-        toast({
-          title: "Welcome back!",
-          description: "You have signed in successfully.",
+    if (justSignedIn && !loading && user && user.id) {
+      // Wait for roles to be loaded (with timeout to prevent infinite wait)
+      if (roles && Array.isArray(roles) && roles.length > 0) {
+        getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
+          toast({
+            title: "Welcome back!",
+            description: "You have signed in successfully.",
+          });
+          navigate(redirectPath, { replace: true });
+          setJustSignedIn(false);
+        }).catch((error) => {
+          console.error("Error getting redirect path:", error);
+          // Fallback to default redirect
+          navigate("/products", { replace: true });
+          setJustSignedIn(false);
         });
-        navigate(redirectPath, { replace: true });
-        setJustSignedIn(false);
-      });
+      } else {
+        // If roles are not loaded yet, wait a bit and check again
+        const timeout = setTimeout(() => {
+          if (roles && Array.isArray(roles) && roles.length > 0) {
+            getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
+              toast({
+                title: "Welcome back!",
+                description: "You have signed in successfully.",
+              });
+              navigate(redirectPath, { replace: true });
+              setJustSignedIn(false);
+            }).catch((error) => {
+              console.error("Error getting redirect path:", error);
+              navigate("/products", { replace: true });
+              setJustSignedIn(false);
+            });
+          } else {
+            // If still no roles after timeout, redirect to products
+            console.warn("Roles not loaded after sign-in, redirecting to products");
+            navigate("/products", { replace: true });
+            setJustSignedIn(false);
+          }
+        }, 2000); // Wait 2 seconds for roles to load
+
+        return () => clearTimeout(timeout);
+      }
     }
   }, [justSignedIn, loading, user, roles, navigate, location.state, toast]);
 

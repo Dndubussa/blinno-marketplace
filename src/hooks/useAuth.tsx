@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(data);
   };
 
-  const fetchRoles = async (userId: string) => {
+  const fetchRoles = async (userId: string): Promise<void> => {
     const { data, error } = await supabase
       .from("user_roles")
       .select("role")
@@ -163,10 +163,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.error("Error fetching roles:", error);
+      setRoles([]);
       return;
     }
 
-    setRoles(data?.map((r) => r.role as AppRole) || []);
+    const rolesArray = data?.map((r) => r.role as AppRole) || [];
+    setRoles(rolesArray);
+    
+    // If no roles found, ensure default buyer role
+    if (rolesArray.length === 0) {
+      try {
+        const { error: insertError } = await supabase.from("user_roles").insert({
+          user_id: userId,
+          role: "buyer",
+        });
+        if (!insertError) {
+          setRoles(["buyer"]);
+        }
+      } catch (err) {
+        console.error("Error creating default buyer role:", err);
+      }
+    }
   };
 
   useEffect(() => {
@@ -388,16 +405,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      return { error };
+      if (error) {
+        return { error };
+      }
+
+      // Wait a bit for the auth state to update via onAuthStateChange
+      // This ensures the user and session are set before returning
+      if (data?.user) {
+        // Give the auth state listener time to process
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        
+        // Ensure we have the user and session set
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSession(session);
+          setUser(session.user);
+          
+          // Fetch profile and roles immediately
+          await fetchProfile(session.user.id);
+          await fetchRoles(session.user.id);
+        }
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      console.error("Sign in error:", err);
+      return { error: err };
     }
-
-    return { error: null };
   };
 
   const signOut = async () => {
