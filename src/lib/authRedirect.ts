@@ -45,6 +45,11 @@ export async function getPostLoginRedirectPath(
   roles: AppRole[],
   intendedPath?: string | null
 ): Promise<string> {
+  // Ensure roles is an array
+  if (!roles || !Array.isArray(roles)) {
+    return getAuthRedirectPath([]);
+  }
+  
   // Check if user needs onboarding (for sellers)
   // This check respects the persistent onboarding_completed flag
   if (roles.includes("seller")) {
