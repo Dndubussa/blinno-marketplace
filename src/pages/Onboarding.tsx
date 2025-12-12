@@ -74,9 +74,37 @@ export default function Onboarding() {
 
   // Get role from location state (if coming from email verification or direct navigation)
   const roleFromState = location.state?.role as Role | undefined;
+  const { roles: userRoles } = useAuth();
+
+  // Determine initial role: prioritize userRoles from database, then location state, then user metadata
+  const getInitialRole = (): Role | null => {
+    // First, check if user already has roles in database
+    if (userRoles && userRoles.length > 0) {
+      // Prioritize seller role if user has multiple roles
+      if (userRoles.includes("seller")) {
+        return "seller";
+      } else if (userRoles.includes("buyer")) {
+        return "buyer";
+      }
+      // Return first role if neither seller nor buyer
+      return userRoles[0] as Role;
+    }
+    
+    // If no roles in database, check location state
+    if (roleFromState) {
+      return roleFromState;
+    }
+    
+    // Finally, check user metadata for intended_role
+    if (user?.user_metadata?.intended_role) {
+      return user.user_metadata.intended_role as Role;
+    }
+    
+    return null;
+  };
 
   const [data, setData] = useState<OnboardingData>({
-    role: roleFromState || null,
+    role: getInitialRole(),
     interests: [],
     sellerType: null,
   });
