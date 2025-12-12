@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -191,6 +192,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { status: onboardingStatus, loading: onboardingLoading, completeStep, completeOnboarding, getSteps } = useOnboardingStatus();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -202,6 +204,23 @@ export default function Onboarding() {
   
   // Get role from location state (if coming from email verification or direct navigation)
   const roleFromState = location.state?.role as Role | undefined;
+  
+  // Determine starting step based on onboarding status
+  useEffect(() => {
+    if (!onboardingLoading && onboardingStatus) {
+      const steps = getSteps();
+      if (steps.length > 0) {
+        // Find the index of the first step that needs to be completed
+        const firstIncompleteStep = steps[0];
+        // Map step ID to step number (this will need to be adjusted based on your step structure)
+        // For now, if user has active pricing plan, start from where they left off
+        if (onboardingStatus.hasActivePricingPlan && onboardingStatus.nextStep) {
+          // User has pricing plan but needs to complete remaining steps
+          // We'll handle this in the step rendering logic
+        }
+      }
+    }
+  }, [onboardingLoading, onboardingStatus, getSteps]);
   
   const [data, setData] = useState<OnboardingData>({
     role: roleFromState || null,
@@ -251,13 +270,46 @@ export default function Onboarding() {
     }
   }, [user, loading, navigate]);
 
-  // If role is provided from state (e.g., from email verification), skip role selection
+  // Check if user has already completed onboarding - redirect to dashboard
+  // This prevents re-triggering onboarding for users with onboarding_completed = true
   useEffect(() => {
-    if (roleFromState && data.role === roleFromState && step === 1) {
-      // Automatically advance to step 2 if role is already set
-      setStep(2);
+    if (!onboardingLoading && onboardingStatus) {
+      // If onboarding is marked as complete with current version, redirect to dashboard
+      if (onboardingStatus.isComplete && onboardingStatus.onboardingVersion >= onboardingStatus.requiredVersion) {
+        toast({
+          title: "Onboarding Already Complete",
+          description: "You have already completed onboarding. Redirecting to dashboard...",
+        });
+        navigate("/seller", { replace: true });
+        return;
+      }
     }
-  }, [roleFromState, data.role, step]);
+  }, [onboardingLoading, onboardingStatus, navigate, toast]);
+
+  // Handle conditional onboarding logic based on user status
+  useEffect(() => {
+    if (!onboardingLoading && onboardingStatus && user) {
+      // If user has active pricing plan but incomplete onboarding, skip to remaining steps
+      if (onboardingStatus.hasActivePricingPlan && onboardingStatus.sellerType) {
+        // User has pricing plan - they may need to complete other steps
+        const steps = getSteps();
+        if (steps.length > 0 && !steps.includes("pricing") && !steps.includes("payment")) {
+          // Skip pricing/payment steps, start from first incomplete step
+          // This will be handled by the step rendering logic
+        }
+      }
+      
+      // If role is provided from state, skip role selection
+      if (roleFromState && data.role === roleFromState && step === 1) {
+        setStep(2);
+      }
+      
+      // If user already has seller type, set it in data
+      if (onboardingStatus.sellerType && !data.role) {
+        setData({ ...data, role: "seller" });
+      }
+    }
+  }, [onboardingLoading, onboardingStatus, roleFromState, data.role, step, user, getSteps]);
 
   const handleRoleSelect = (role: Role) => {
     setData({ ...data, role });
@@ -415,6 +467,35 @@ export default function Onboarding() {
           });
 
         if (subError) throw subError;
+
+        // Mark onboarding as complete using the new system
+        // This sets the persistent flag that prevents re-triggering
+        if (user?.id) {
+          const sellerType = onboardingStatus?.sellerType || "individual";
+          const allCompletedSteps = [...(onboardingStatus?.completedSteps || []), "pricing", "payment"];
+          
+          const onboardingData = {
+            businessName: data.businessName,
+            businessDescription: data.businessDescription,
+            businessAddress: data.businessAddress,
+            phoneNumber: data.phoneNumber,
+            pricingModel: data.pricingModel,
+            plan: data.plan,
+            paymentNetwork: data.paymentNetwork,
+            completedSteps: allCompletedSteps,
+          };
+
+          const success = await completeOnboarding(sellerType, onboardingData);
+          
+          if (!success) {
+            console.error("Failed to mark onboarding as complete");
+            toast({
+              title: "Warning",
+              description: "Onboarding completed but flag may not have been set. Please contact support if you see this message again.",
+              variant: "destructive",
+            });
+          }
+        }
 
         toast({
           title: "Welcome to Blinno!",

@@ -4,7 +4,9 @@ import { motion } from "framer-motion";
 import { Mail, CheckCircle, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthRedirectPath } from "@/lib/authRedirect";
 import blinnoLogo from "@/assets/blinno-logo.png";
 
 export default function VerifyEmail() {
@@ -14,6 +16,7 @@ export default function VerifyEmail() {
   const [userEmail, setUserEmail] = useState("");
   const [isRedirecting, setIsRedirecting] = useState(false);
   const { toast } = useToast();
+  const { roles } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -265,8 +268,9 @@ export default function VerifyEmail() {
     } else if (userRole === "buyer") {
       navigate("/buyer");
     } else {
-      // Default: redirect to marketplace (home page)
-      navigate("/");
+      // Default: use auth redirect utility to determine correct path
+      const redirectPath = getAuthRedirectPath(roles);
+      navigate(redirectPath);
     }
   }, [isRedirecting, role, navigate, toast]);
 

@@ -1,17 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, ArrowLeft, Mail, Lock, User, ShoppingBag, Store } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Mail, Lock, User, ShoppingBag, Store, AlertCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { parseSignupError, type AccountExistenceError } from "@/lib/accountValidation";
+import { getPostLoginRedirectPath } from "@/lib/authRedirect";
 import blinnoLogo from "@/assets/blinno-logo.png";
 
 const signUpSchema = z.object({
@@ -68,16 +71,24 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
-  const { signUp, signIn, user, loading } = useAuth();
+  const [accountError, setAccountError] = useState<AccountExistenceError | null>(null);
+  const { signUp, signIn, user, loading, roles } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      navigate("/");
+      const redirectPath = getPostLoginRedirectPath(roles, location.state?.from?.pathname);
+      navigate(redirectPath, { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, roles, navigate, location.state]);
+
+  // Clear account error when switching views
+  useEffect(() => {
+    setAccountError(null);
+  }, [view]);
 
   const signUpForm = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
@@ -113,6 +124,7 @@ export default function Auth() {
 
   const handleSignUp = async (data: SignUpFormData) => {
     setIsLoading(true);
+    setAccountError(null);
     
     const { error } = await supabase.auth.signUp({
       email: data.email,
@@ -127,16 +139,26 @@ export default function Auth() {
     });
 
     if (error) {
-      let message = error.message;
-      if (message.includes("already registered")) {
-        message = "This email is already registered. Please sign in instead.";
+      // Check for account existence error
+      const accountExistenceError = parseSignupError(error);
+      
+      if (accountExistenceError) {
+        setAccountError(accountExistenceError);
+        toast({
+          title: "Account already exists",
+          description: accountExistenceError.userMessage,
+          variant: "destructive",
+        });
+      } else {
+        // Handle other errors
+        toast({
+          title: "Sign up failed",
+          description: error.message,
+          variant: "destructive",
+        });
       }
-      toast({
-        title: "Sign up failed",
-        description: message,
-        variant: "destructive",
-      });
     } else {
+      setAccountError(null);
       toast({
         title: "Check your email",
         description: "We've sent you a verification link. Click it to verify your account.",
@@ -145,6 +167,22 @@ export default function Auth() {
     }
     setIsLoading(false);
   };
+
+  const [justSignedIn, setJustSignedIn] = useState(false);
+
+  // Handle redirect after successful sign in (once roles are loaded)
+  useEffect(() => {
+    if (justSignedIn && !loading && user && roles.length > 0) {
+      getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
+        toast({
+          title: "Welcome back!",
+          description: "You have signed in successfully.",
+        });
+        navigate(redirectPath, { replace: true });
+        setJustSignedIn(false);
+      });
+    }
+  }, [justSignedIn, loading, user, roles, navigate, location.state, toast]);
 
   const handleSignIn = async (data: SignInFormData) => {
     setIsLoading(true);
@@ -160,14 +198,12 @@ export default function Auth() {
         description: message,
         variant: "destructive",
       });
+      setIsLoading(false);
     } else {
-      toast({
-        title: "Welcome back!",
-        description: "You have signed in successfully.",
-      });
-      navigate("/");
+      // Mark that we just signed in - useEffect will handle redirect once roles load
+      setJustSignedIn(true);
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleForgotPassword = async (data: ForgotPasswordFormData) => {
@@ -311,6 +347,88 @@ export default function Auth() {
           {/* Forms */}
           {view === "signUp" ? (
             <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
+              {/* Account Existence Error Alert */}
+              {accountError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Account Already Exists</AlertTitle>
+                  <AlertDescription className="mt-2 space-y-3">
+                    <p>{accountError.userMessage}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {accountError.actions.signIn && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setAccountError(null);
+                            setView("signIn");
+                            signInForm.setValue("email", signUpForm.getValues("email"));
+                          }}
+                          className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        >
+                          Sign In Instead
+                        </Button>
+                      )}
+                      {accountError.actions.resetPassword && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const email = signUpForm.getValues("email");
+                            setAccountError(null);
+                            setView("forgotPassword");
+                            forgotPasswordForm.setValue("email", email);
+                            toast({
+                              title: "Password Reset",
+                              description: "You can reset your password on the next screen.",
+                            });
+                          }}
+                          className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        >
+                          Reset Password
+                        </Button>
+                      )}
+                      {accountError.actions.resendVerification && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const email = signUpForm.getValues("email");
+                            const { error } = await supabase.auth.resend({
+                              type: 'signup',
+                              email: email,
+                              options: {
+                                emailRedirectTo: `${window.location.origin}/verify-email?verified=true`,
+                              },
+                            });
+                            
+                            if (error) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } else {
+                              setAccountError(null);
+                              toast({
+                                title: "Verification email sent",
+                                description: "Please check your email for the verification link.",
+                              });
+                            }
+                          }}
+                          className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        >
+                          Resend Verification Email
+                        </Button>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               {/* Role Selection */}
               <div className="space-y-2">
                 <Label className="text-foreground">I want to</Label>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getPostLoginRedirectPath } from "@/lib/authRedirect";
 import blinnoLogo from "@/assets/blinno-logo.png";
 
 const signInSchema = z.object({
@@ -32,15 +33,33 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
-  const { signIn, user, loading } = useAuth();
+  const [justSignedIn, setJustSignedIn] = useState(false);
+  const { signIn, user, loading, roles } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // Redirect if already authenticated
   useEffect(() => {
-    if (!loading && user) {
-      navigate("/");
+    if (!loading && user && !justSignedIn) {
+      const redirectPath = getPostLoginRedirectPath(roles, location.state?.from?.pathname);
+      navigate(redirectPath, { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, roles, navigate, location.state, justSignedIn]);
+
+  // Handle redirect after successful sign in (once roles are loaded)
+  useEffect(() => {
+    if (justSignedIn && !loading && user && roles.length > 0) {
+      getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
+        toast({
+          title: "Welcome back!",
+          description: "You have signed in successfully.",
+        });
+        navigate(redirectPath, { replace: true });
+        setJustSignedIn(false);
+      });
+    }
+  }, [justSignedIn, loading, user, roles, navigate, location.state, toast]);
 
   const signInForm = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -71,14 +90,12 @@ export default function SignIn() {
         description: message,
         variant: "destructive",
       });
+      setIsLoading(false);
     } else {
-      toast({
-        title: "Welcome back!",
-        description: "You have signed in successfully.",
-      });
-      navigate("/");
+      // Mark that we just signed in - useEffect will handle redirect once roles load
+      setJustSignedIn(true);
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleForgotPassword = async (data: ForgotPasswordFormData) => {

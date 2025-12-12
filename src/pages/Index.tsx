@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { HeroSection } from "@/components/HeroSection";
 import { PartnersSection } from "@/components/PartnersSection";
@@ -13,9 +15,25 @@ import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import { OnboardingTour, useOnboardingTour } from "@/components/OnboardingTour";
+import { useAuth } from "@/hooks/useAuth";
+import { getAuthRedirectPath } from "@/lib/authRedirect";
 
 const Index = () => {
   const { showTour, closeTour, completeTour } = useOnboardingTour();
+  const { user, loading, roles } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Redirect authenticated users to their dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      const redirectPath = getAuthRedirectPath(roles);
+      // Only redirect if we're on the landing page (not if user explicitly navigated here)
+      if (location.pathname === "/") {
+        navigate(redirectPath, { replace: true });
+      }
+    }
+  }, [user, loading, roles, navigate, location.pathname]);
 
   return (
     <div className="min-h-screen bg-white">

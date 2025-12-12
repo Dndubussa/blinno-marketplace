@@ -18,12 +18,82 @@ const handler = async (req: Request): Promise<Response> => {
   console.log("Verification email function called");
   
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      }
+    });
   }
 
   try {
-    const { email, verificationUrl, recipientName = "there" }: VerificationEmailRequest = await req.json();
-    
+    // Validate API key exists
+    if (!RESEND_API_KEY) {
+      console.error("RESEND_API_KEY environment variable is not set");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Email service not configured. Please contact support." 
+        }),
+        { 
+          status: 500, 
+          headers: { "Content-Type": "application/json", ...corsHeaders } 
+        }
+      );
+    }
+
+    // Parse and validate request payload
+    let requestData: VerificationEmailRequest;
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Invalid request format. Expected JSON." 
+        }),
+        { 
+          status: 400, 
+          headers: { "Content-Type": "application/json", ...corsHeaders } 
+        }
+      );
+    }
+
+    const { email, verificationUrl, recipientName = "there" } = requestData;
+
+    // Validate required fields
+    if (!email || !verificationUrl) {
+      console.error("Missing required fields:", { hasEmail: !!email, hasVerificationUrl: !!verificationUrl });
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Missing required fields: email and verificationUrl are required" 
+        }),
+        { 
+          status: 400, 
+          headers: { "Content-Type": "application/json", ...corsHeaders } 
+        }
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.error("Invalid email format:", email);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Invalid email address format" 
+        }),
+        { 
+          status: 400, 
+          headers: { "Content-Type": "application/json", ...corsHeaders } 
+        }
+      );
+    }
+
     console.log("Sending verification email to:", email);
 
     const emailHtml = `
@@ -115,9 +185,71 @@ const handler = async (req: Request): Promise<Response> => {
       }),
     });
 
-    const emailResponse = await res.json();
+    // Check HTTP response status before parsing JSON
+    if (!res.ok) {
+      let errorData: any;
+      try {
+        errorData = await res.json();
+      } catch {
+        errorData = { message: `HTTP ${res.status}: ${res.statusText}` };
+      }
 
-    console.log("Verification email sent successfully:", emailResponse);
+      console.error("Resend API error:", {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData
+      });
+
+      // Map common error codes to user-friendly messages
+      let errorMessage = "Failed to send verification email";
+      if (res.status === 401 || res.status === 403) {
+        errorMessage = "Email service authentication failed. Please contact support.";
+      } else if (res.status === 429) {
+        errorMessage = "Too many email requests. Please wait a moment and try again.";
+      } else if (res.status === 422) {
+        errorMessage = errorData.message || "Invalid email address or configuration.";
+      } else if (res.status >= 500) {
+        errorMessage = "Email service temporarily unavailable. Please try again later.";
+      } else {
+        errorMessage = errorData.message || `Failed to send email (${res.status})`;
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: errorMessage,
+          details: errorData
+        }),
+        { 
+          status: res.status >= 500 ? 500 : res.status,
+          headers: { "Content-Type": "application/json", ...corsHeaders } 
+        }
+      );
+    }
+
+    // Parse successful response
+    let emailResponse: any;
+    try {
+      emailResponse = await res.json();
+    } catch (parseError) {
+      console.error("Failed to parse Resend API response:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Email sent but could not confirm delivery status" 
+        }),
+        { 
+          status: 200, // Still return 200 since email might have been sent
+          headers: { "Content-Type": "application/json", ...corsHeaders } 
+        }
+      );
+    }
+
+    console.log("Verification email sent successfully:", {
+      emailId: emailResponse.id,
+      to: email,
+      timestamp: new Date().toISOString()
+    });
 
     return new Response(JSON.stringify({ success: true, data: emailResponse }), {
       status: 200,

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import blinnoLogo from "@/assets/blinno-logo.png";
 import { useAuth } from "@/hooks/useAuth";
+import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -115,8 +116,7 @@ export default function SellerDashboard() {
   const { user, loading, hasRole, becomeSeller } = useAuth();
   const navigate = useNavigate();
   const { showTour, startTour, closeTour, completeTour } = useSellerOnboardingTour();
-  const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
-  const [checkingSubscription, setCheckingSubscription] = useState(true);
+  const { status: onboardingStatus, loading: onboardingLoading, shouldShowOnboarding } = useOnboardingStatus();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -124,32 +124,19 @@ export default function SellerDashboard() {
     }
   }, [user, loading, navigate]);
 
-  // Check if seller has a subscription/pricing model selected
+  // Redirect to onboarding if needed
+  // This respects the persistent onboarding_completed flag
   useEffect(() => {
-    const checkSubscription = async () => {
-      if (!user || !hasRole("seller")) {
-        setCheckingSubscription(false);
-        return;
+    if (!loading && !onboardingLoading && user && hasRole("seller")) {
+      // Only redirect if onboarding is truly incomplete
+      // If onboarding_completed flag is true and version is current, never redirect
+      if (shouldShowOnboarding && onboardingStatus && !onboardingStatus.isComplete) {
+        navigate("/onboarding", { replace: true });
       }
-
-      const { data, error } = await supabase
-        .from("seller_subscriptions")
-        .select("id")
-        .eq("seller_id", user.id)
-        .maybeSingle();
-
-      setHasSubscription(!!data);
-      setCheckingSubscription(false);
-    };
-
-    if (user && hasRole("seller")) {
-      checkSubscription();
-    } else {
-      setCheckingSubscription(false);
     }
-  }, [user, hasRole]);
+  }, [loading, onboardingLoading, user, hasRole, shouldShowOnboarding, onboardingStatus, navigate]);
 
-  if (loading || checkingSubscription) {
+  if (loading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -188,32 +175,11 @@ export default function SellerDashboard() {
     );
   }
 
-  // If seller hasn't selected pricing model, redirect to onboarding
-  if (!hasSubscription) {
+  // If onboarding is not complete, show loading (will redirect)
+  if (shouldShowOnboarding) {
     return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white border border-border rounded-2xl p-8 max-w-md text-center shadow-sm"
-        >
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary mx-auto mb-6">
-            <Store className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold mb-2 text-foreground">Complete Your Setup</h1>
-          <p className="text-muted-foreground mb-6">
-            You need to choose a pricing plan before you can access your seller dashboard.
-          </p>
-          <div className="flex flex-col gap-3">
-            <Button onClick={() => navigate("/onboarding", { state: { role: "seller" } })}>
-              Choose Pricing Plan
-            </Button>
-            <Button variant="ghost" onClick={() => navigate("/")}>
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Button>
-          </div>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
