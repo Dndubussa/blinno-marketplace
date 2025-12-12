@@ -396,7 +396,26 @@ export default function Onboarding() {
     pollCountRef.current = 0;
 
     try {
-      const selectedPlan = data.plan;
+      // Validate required data
+      if (!data.pricingModel) {
+        throw new Error("Pricing model not selected. Please go back and select a pricing model.");
+      }
+
+      if (!data.plan) {
+        throw new Error("Plan not selected. Please go back and select a plan.");
+      }
+
+      const selectedPlan = String(data.plan).trim();
+      const pricingModel = String(data.pricingModel).trim();
+
+      console.log("Payment data:", {
+        pricingModel,
+        selectedPlan,
+        phoneNumber: data.phoneNumber ? "***" : "missing",
+        paymentNetwork: data.paymentNetwork,
+        fullData: { ...data, phoneNumber: data.phoneNumber ? "***" : "missing" },
+      });
+
       const subscriptionPrices: Record<string, number> = {
         starter: 25000,
         professional: 75000,
@@ -408,14 +427,22 @@ export default function Onboarding() {
         scale: 15,
       };
 
-      const planPrice =
-        data.pricingModel === "subscription"
-          ? subscriptionPrices[selectedPlan] || 0
-          : percentagePrices[selectedPlan] || 0;
+      // Only subscription plans require payment
+      if (pricingModel !== "subscription") {
+        throw new Error(`Payment is only required for subscription plans. Your selected model is: ${pricingModel}`);
+      }
 
-      // Validate plan price is valid
+      // Get plan price for subscription
+      const planPrice = subscriptionPrices[selectedPlan];
+      
       if (!planPrice || planPrice <= 0) {
-        throw new Error(`Invalid plan selected: ${selectedPlan}. Please select a valid subscription plan.`);
+        console.error("Plan price lookup failed:", {
+          selectedPlan,
+          pricingModel,
+          availablePlans: Object.keys(subscriptionPrices),
+          lookupResult: planPrice,
+        });
+        throw new Error(`Invalid subscription plan: "${selectedPlan}". Valid plans are: ${Object.keys(subscriptionPrices).join(", ")}`);
       }
 
       // Format phone number for ClickPesa (ensure it starts with 255)
