@@ -113,6 +113,80 @@ async function initiatePayment(payload: PaymentRequest) {
 }
 
 /**
+ * Initiate Flutterwave Hosted Checkout
+ * Creates a payment link that redirects users to Flutterwave's checkout page
+ */
+async function initiateCheckout(payload: {
+  amount: number;
+  currency: string;
+  reference: string;
+  description: string;
+  customer: { email: string; name: string };
+  redirect_url: string;
+  meta?: Record<string, any>;
+}) {
+  console.log("Initiating Flutterwave Hosted Checkout...", {
+    amount: payload.amount,
+    reference: payload.reference,
+  });
+
+  if (!FLUTTERWAVE_SECRET_KEY) {
+    throw new Error("Flutterwave secret key not configured. Please set FLUTTERWAVE_SECRET_KEY environment variable.");
+  }
+
+  // Flutterwave Payment Links API payload
+  const checkoutPayload = {
+    tx_ref: payload.reference,
+    amount: payload.amount,
+    currency: payload.currency || "TZS",
+    payment_options: "card,mobilemoney,ussd,banktransfer",
+    redirect_url: payload.redirect_url,
+    customer: {
+      email: payload.customer.email,
+      name: payload.customer.name,
+    },
+    customizations: {
+      title: "Blinno Subscription",
+      description: payload.description,
+      logo: "https://www.blinno.app/logo.png", // Update with actual logo URL
+    },
+    meta: payload.meta || {},
+  };
+
+  console.log("Flutterwave checkout payload:", JSON.stringify(checkoutPayload, null, 2));
+
+  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/payments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+    },
+    body: JSON.stringify(checkoutPayload),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("Flutterwave checkout initiation error:", error);
+    throw new Error(`Checkout initiation failed: ${error}`);
+  }
+
+  const result = await response.json();
+  console.log("Flutterwave checkout response:", JSON.stringify(result, null, 2));
+
+  if (result.status === "success" && result.data?.link) {
+    return {
+      success: true,
+      checkout_url: result.data.link,
+      reference: result.data.tx_ref || payload.reference,
+      transaction_id: result.data.id || null,
+      message: "Checkout link created successfully",
+    };
+  } else {
+    throw new Error(result.message || "Checkout initiation failed");
+  }
+}
+
+/**
  * Check Flutterwave Payment Status
  */
 async function checkPaymentStatus(transactionId: string) {
@@ -309,6 +383,91 @@ serve(async (req) => {
         } catch (paymentError: unknown) {
           const errorMessage = paymentError instanceof Error ? paymentError.message : "Unknown payment error";
           console.error("Payment initiation error:", errorMessage);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: errorMessage,
+              message: errorMessage,
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      case "initiate-checkout": {
+        try {
+          // Validate required fields
+          const missingFields: string[] = [];
+          if (!payload.amount && payload.amount !== 0) missingFields.push("amount");
+          if (!payload.reference) missingFields.push("reference");
+          if (!payload.redirect_url) missingFields.push("redirect_url");
+          if (!payload.customer?.email) missingFields.push("customer.email");
+
+          if (missingFields.length > 0) {
+            console.error("Missing required fields:", missingFields);
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: `Missing required fields: ${missingFields.join(", ")}`,
+                message: `Missing required fields: ${missingFields.join(", ")}`,
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Validate amount
+          const amount = Number(payload.amount);
+          if (isNaN(amount) || amount <= 0) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: `Invalid amount: ${payload.amount}. Amount must be a positive number`,
+                message: `Invalid amount: ${payload.amount}. Amount must be a positive number`,
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Initiate checkout
+          const result = await initiateCheckout({
+            amount: amount,
+            currency: payload.currency || "TZS",
+            reference: String(payload.reference).trim(),
+            description: payload.description || "Blinno Subscription",
+            customer: {
+              email: payload.customer.email,
+              name: payload.customer.name || "Blinno Customer",
+            },
+            redirect_url: String(payload.redirect_url).trim(),
+            meta: payload.meta || {},
+          });
+
+          // Store the transaction in the database (non-blocking)
+          try {
+            const { error: txError } = await supabase.from("payment_transactions").insert({
+              user_id: user.id,
+              amount: amount,
+              currency: payload.currency || "TZS",
+              reference: result.reference,
+              clickpesa_reference: result.transaction_id || null,
+              status: "pending",
+              description: payload.description || "Blinno Subscription",
+              network: "flutterwave_checkout",
+            });
+
+            if (txError) {
+              console.error("Error storing transaction (non-critical):", txError);
+            }
+          } catch (dbError) {
+            console.error("Database error (non-critical):", dbError);
+          }
+
+          return new Response(JSON.stringify({ success: true, data: result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (checkoutError: unknown) {
+          const errorMessage = checkoutError instanceof Error ? checkoutError.message : "Unknown checkout error";
+          console.error("Checkout initiation error:", errorMessage);
           return new Response(
             JSON.stringify({
               success: false,

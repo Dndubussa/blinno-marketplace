@@ -442,6 +442,92 @@ export default function Onboarding() {
     }
   };
 
+  // Handle subscription checkout initiation (Flutterwave Hosted Checkout)
+  const handleSubscribe = useCallback(async () => {
+    if (!data.pricingModel || !data.plan) {
+      toast({
+        title: "Plan selection required",
+        description: "Please select a pricing model and plan before subscribing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (data.pricingModel !== "subscription") {
+      // For percentage plans, just proceed to next step
+      handleSellerNext();
+      return;
+    }
+
+    setIsProcessingPayment(true);
+
+    try {
+      const subscriptionPrices: Record<string, number> = {
+        starter: 25000,
+        professional: 75000,
+        enterprise: 250000,
+      };
+
+      const selectedPlan = String(data.plan).trim();
+      const planPrice = subscriptionPrices[selectedPlan];
+
+      if (!planPrice || planPrice <= 0) {
+        throw new Error(`Invalid subscription plan: "${selectedPlan}"`);
+      }
+
+      const reference = `SUB-${user?.id?.slice(0, 8)}-${Date.now()}`;
+
+      // Save pricing data before redirecting
+      if (user?.id) {
+        await completeStep("pricing", {
+          pricingModel: data.pricingModel,
+          plan: data.plan,
+          reference,
+        });
+      }
+
+      // Initiate Flutterwave Hosted Checkout
+      const { data: checkoutData, error } = await supabase.functions.invoke("flutterwave-payment", {
+        body: {
+          action: "initiate-checkout",
+          amount: planPrice,
+          currency: "TZS",
+          reference: reference,
+          description: `Blinno ${selectedPlan} Plan Subscription`,
+          customer: {
+            email: user?.email || "",
+            name: user?.user_metadata?.full_name || "Blinno Customer",
+          },
+          redirect_url: `${window.location.origin}/onboarding/payment-callback?reference=${reference}`,
+          meta: {
+            plan: selectedPlan,
+            pricingModel: data.pricingModel,
+            userId: user?.id,
+          },
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to initiate checkout");
+      }
+
+      if (!checkoutData?.success || !checkoutData?.data?.checkout_url) {
+        throw new Error(checkoutData?.error || "Failed to create checkout link");
+      }
+
+      // Redirect to Flutterwave checkout page
+      window.location.href = checkoutData.data.checkout_url;
+    } catch (error: any) {
+      console.error("Subscription checkout error:", error);
+      toast({
+        title: "Checkout Error",
+        description: error.message || "Failed to initiate checkout. Please try again.",
+        variant: "destructive",
+      });
+      setIsProcessingPayment(false);
+    }
+  }, [data.pricingModel, data.plan, user, completeStep, toast, handleSellerNext]);
+
   const handlePayment = async () => {
     if (!data.phoneNumber) {
       toast({
@@ -978,6 +1064,7 @@ export default function Onboarding() {
                       onNext={handleSellerNext}
                       onBack={sellerStepIndex > 0 ? handleSellerBack : undefined}
                       onPaymentInitiate={handlePayment}
+                      onSubscribe={handleSubscribe}
                       paymentStatus={paymentStatus}
                       isProcessingPayment={isProcessingPayment}
                     />

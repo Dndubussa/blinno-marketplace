@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Onboarding from "./pages/Onboarding";
+import OnboardingPaymentCallback from "./pages/OnboardingPaymentCallback";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import TermsOfService from "./pages/TermsOfService";
@@ -113,6 +114,7 @@ const App = () => (
                 <Route path="/sign-in" element={<SignIn />} />
                 <Route path="/sign-up" element={<SignUp />} />
                 <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/onboarding/payment-callback" element={<OnboardingPaymentCallback />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/terms" element={<TermsOfService />} />

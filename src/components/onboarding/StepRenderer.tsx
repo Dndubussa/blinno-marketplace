@@ -18,6 +18,7 @@ interface StepRendererProps {
   onNext?: () => void;
   onBack?: () => void;
   onPaymentInitiate?: () => void;
+  onSubscribe?: () => void;
   paymentStatus?: "pending" | "completed" | "failed" | null;
   isProcessingPayment?: boolean;
 }
@@ -30,6 +31,7 @@ export function StepRenderer({
   onNext,
   onBack,
   onPaymentInitiate,
+  onSubscribe,
   paymentStatus,
   isProcessingPayment,
 }: StepRendererProps) {
@@ -52,6 +54,8 @@ export function StepRenderer({
         onChange={onChange}
         onNext={onNext}
         onBack={onBack}
+        onSubscribe={onSubscribe}
+        isProcessing={isProcessingPayment}
       />
     );
   }

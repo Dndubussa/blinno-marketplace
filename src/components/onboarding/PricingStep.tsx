@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Zap, TrendingUp, Crown, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Zap, TrendingUp, Crown, Check, Loader2 } from "lucide-react";
 import type { PricingModel, SubscriptionPlan, PercentagePlan } from "@/pages/Onboarding";
 
 // Import plans from Onboarding (or move to shared location)
@@ -131,9 +131,11 @@ interface PricingStepProps {
   onChange: (fieldId: string, value: any) => void;
   onNext?: () => void;
   onBack?: () => void;
+  onSubscribe?: () => void;
+  isProcessing?: boolean;
 }
 
-export function PricingStep({ data, onChange, onNext, onBack }: PricingStepProps) {
+export function PricingStep({ data, onChange, onNext, onBack, onSubscribe, isProcessing }: PricingStepProps) {
   const pricingModel = data.pricingModel || "subscription";
   const selectedPlan = data.plan || (pricingModel === "subscription" ? "professional" : "growth");
   const currentPlans = pricingModel === "subscription" ? subscriptionPlans : percentagePlans;
@@ -217,18 +219,32 @@ export function PricingStep({ data, onChange, onNext, onBack }: PricingStepProps
 
       <div className="flex justify-between pt-4">
         {onBack && (
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} disabled={isProcessing}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
         )}
         <div className="flex-1" />
-        {onNext && (
-          <Button onClick={onNext}>
+        {pricingModel === "subscription" && onSubscribe ? (
+          <Button onClick={onSubscribe} disabled={isProcessing || !selectedPlan}>
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                Subscribe
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        ) : onNext ? (
+          <Button onClick={onNext} disabled={isProcessing}>
             Next
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-        )}
+        ) : null}
       </div>
     </div>
   );
