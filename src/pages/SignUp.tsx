@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { z } from "zod";
@@ -14,12 +14,27 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { parseSignupError, type AccountExistenceError } from "@/lib/accountValidation";
+import { validatePassword } from "@/lib/passwordValidation";
+import { PasswordStrengthMeter } from "@/components/ui/password-strength-meter";
 import blinnoLogo from "@/assets/blinno-logo.png";
 
 const signUpSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters").max(100),
   email: z.string().email("Invalid email address").max(255),
-  password: z.string().min(8, "Password must be at least 8 characters").max(100),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(100)
+    .refine(
+      (password) => {
+        const result = validatePassword(password);
+        return result.isValid;
+      },
+      (password) => {
+        const result = validatePassword(password);
+        return { message: result.errors.join(". ") };
+      }
+    ),
   confirmPassword: z.string().min(1, "Please confirm your password"),
   role: z.enum(["buyer", "seller"], { required_error: "Please select a role" }),
   acceptTerms: z.boolean().refine((val) => val === true, {
@@ -34,21 +49,6 @@ const signUpSchema = z.object({
 });
 
 type SignUpFormData = z.infer<typeof signUpSchema>;
-
-const calculatePasswordStrength = (password: string): { score: number; label: string; color: string } => {
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (password.length >= 12) score++;
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-  if (score <= 1) return { score: 1, label: "Weak", color: "bg-destructive" };
-  if (score <= 2) return { score: 2, label: "Fair", color: "bg-orange-500" };
-  if (score <= 3) return { score: 3, label: "Good", color: "bg-yellow-500" };
-  if (score <= 4) return { score: 4, label: "Strong", color: "bg-green-500" };
-  return { score: 5, label: "Very Strong", color: "bg-green-600" };
-};
 
 export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
@@ -80,7 +80,6 @@ export default function SignUp() {
   });
 
   const watchedPassword = signUpForm.watch("password");
-  const passwordStrength = useMemo(() => calculatePasswordStrength(watchedPassword || ""), [watchedPassword]);
   const selectedRole = signUpForm.watch("role");
 
   const handleSignUp = async (data: SignUpFormData) => {
@@ -403,26 +402,7 @@ export default function SignUp() {
                 </button>
               </div>
               {watchedPassword && (
-                <div className="space-y-1">
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((level) => (
-                      <div
-                        key={level}
-                        className={`h-1.5 flex-1 rounded-full transition-colors ${
-                          level <= passwordStrength.score ? passwordStrength.color : "bg-muted"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className={`text-xs ${
-                    passwordStrength.score <= 1 ? "text-destructive" :
-                    passwordStrength.score <= 2 ? "text-orange-500" :
-                    passwordStrength.score <= 3 ? "text-yellow-600" :
-                    "text-green-600"
-                  }`}>
-                    Password strength: {passwordStrength.label}
-                  </p>
-                </div>
+                <PasswordStrengthMeter password={watchedPassword} />
               )}
               {signUpForm.formState.errors.password && (
                 <p className="text-sm text-destructive">

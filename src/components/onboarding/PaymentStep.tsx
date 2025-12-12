@@ -3,15 +3,14 @@
  * Handles payment setup and processing
  */
 
-import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import type { MobileNetwork } from "@/pages/Onboarding";
+
+type MobileNetwork = "MPESA" | "TIGOPESA" | "AIRTELMONEY" | "HALOPESA";
 
 const mobileNetworks: { id: MobileNetwork; name: string; color: string; description?: string }[] = [
   { id: "MPESA", name: "M-Pesa", color: "bg-green-500", description: "Vodacom" },
@@ -26,6 +25,9 @@ interface PaymentStepProps {
   onNext?: () => void;
   onBack?: () => void;
   onComplete?: () => void;
+  onPaymentInitiate?: () => void;
+  paymentStatus?: "pending" | "completed" | "failed" | null;
+  isProcessingPayment?: boolean;
   userId?: string;
 }
 
@@ -35,11 +37,14 @@ export function PaymentStep({
   onNext,
   onBack,
   onComplete,
+  onPaymentInitiate,
+  paymentStatus: parentPaymentStatus,
+  isProcessingPayment: parentIsProcessing,
   userId,
 }: PaymentStepProps) {
   const { toast } = useToast();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<"pending" | "completed" | "failed" | null>(null);
+  const isProcessing = parentIsProcessing || false;
+  const paymentStatus = parentPaymentStatus || null;
 
   const pricingModel = data.pricingModel || "subscription";
   const phoneNumber = data.phoneNumber || "";
@@ -87,7 +92,7 @@ export function PaymentStep({
     );
   }
 
-  const handlePayment = async () => {
+  const handlePayment = () => {
     if (!phoneNumber) {
       toast({
         title: "Phone number required",
@@ -97,67 +102,18 @@ export function PaymentStep({
       return;
     }
 
-    setIsProcessing(true);
-    setPaymentStatus(null);
-
-    try {
-      const selectedPlan = data.plan;
-      // Plan prices - should match Onboarding.tsx
-      const subscriptionPrices: Record<string, number> = {
-        starter: 25000,
-        professional: 75000,
-        enterprise: 250000,
-      };
-      const percentagePrices: Record<string, number> = {
-        basic: 7,
-        growth: 10,
-        scale: 15,
-      };
-      
-      const planPrice = data.pricingModel === "subscription" 
-        ? subscriptionPrices[selectedPlan] || 0
-        : percentagePrices[selectedPlan] || 0;
-      
-      const reference = `SUB-${userId?.slice(0, 8)}-${Date.now()}`;
-      
-      const { data: paymentData, error } = await supabase.functions.invoke(
-        "clickpesa-payment",
-        {
-          body: {
-            action: "initiate",
-            amount: planPrice,
-            currency: "TZS",
-            phone_number: phoneNumber,
-            network: paymentNetwork,
-            reference: reference,
-            description: `Blinno ${selectedPlan} Plan Subscription`,
-          },
-        }
-      );
-
-      if (error) {
-        throw new Error(error.message || "Failed to connect to payment service");
-      }
-
-      if (paymentData?.success) {
-        setPaymentStatus("pending");
-        toast({
-          title: "Payment initiated",
-          description: "Check your phone for the payment prompt. Please approve to continue.",
-        });
-        // Payment polling would happen here (similar to existing Onboarding.tsx)
-      } else {
-        throw new Error(paymentData?.error || "Payment failed");
-      }
-    } catch (error: any) {
+    if (!paymentNetwork) {
       toast({
-        title: "Payment failed",
-        description: error.message || "Could not process payment. Please try again.",
+        title: "Payment method required",
+        description: "Please select a mobile money network",
         variant: "destructive",
       });
-      setPaymentStatus("failed");
-    } finally {
-      setIsProcessing(false);
+      return;
+    }
+
+    // Trigger parent's payment handler
+    if (onPaymentInitiate) {
+      onPaymentInitiate();
     }
   };
 

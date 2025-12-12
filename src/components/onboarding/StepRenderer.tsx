@@ -17,6 +17,9 @@ interface StepRendererProps {
   onChange: (fieldId: string, value: any) => void;
   onNext?: () => void;
   onBack?: () => void;
+  onPaymentInitiate?: () => void;
+  paymentStatus?: "pending" | "completed" | "failed" | null;
+  isProcessingPayment?: boolean;
 }
 
 export function StepRenderer({
@@ -26,6 +29,9 @@ export function StepRenderer({
   onChange,
   onNext,
   onBack,
+  onPaymentInitiate,
+  paymentStatus,
+  isProcessingPayment,
 }: StepRendererProps) {
   // Render category selection step
   if (step.id === "category") {
@@ -57,6 +63,10 @@ export function StepRenderer({
         onChange={onChange}
         onNext={onNext}
         onBack={onBack}
+        onComplete={onNext}
+        onPaymentInitiate={onPaymentInitiate}
+        paymentStatus={paymentStatus}
+        isProcessingPayment={isProcessingPayment}
       />
     );
   }

@@ -216,8 +216,15 @@ export default function Checkout() {
         throw new Error(paymentResult?.error || "Payment initiation failed");
       }
 
-      // Store payment reference for status polling
+      // Store payment reference and transaction ID for status polling
       setPaymentReference(reference);
+      
+      // Store transaction ID from ClickPesa response if available
+      const transactionId = paymentResult?.data?.transaction_id || paymentResult?.data?.reference || null;
+      if (transactionId) {
+        // Store in a ref or state for status checking
+        // The backend will look it up by reference, but we can also use transaction_id directly
+      }
 
       // Show USSD push notification
       toast.success(
@@ -259,11 +266,12 @@ export default function Checkout() {
     if (!paymentReference || !orderId || paymentStatus !== "pending") return;
 
     try {
+      // Use reference only - backend will look up transaction_id from database
       const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
         body: {
           action: "check-status",
           reference: paymentReference,
-          transaction_id: paymentReference,
+          // Don't pass transaction_id - let backend look it up by reference
         },
       });
 

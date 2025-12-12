@@ -6,60 +6,35 @@ import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ShoppingBag,
   Store,
   ArrowRight,
   ArrowLeft,
   Check,
-  MapPin,
-  Phone,
-  Building,
   Sparkles,
   Heart,
   Package,
   TrendingUp,
-  Crown,
-  Zap,
   Loader2,
-  CreditCard,
-  Percent,
 } from "lucide-react";
+import { StepRenderer } from "@/components/onboarding/StepRenderer";
+import { getStepConfig, validateStep, type StepId } from "@/lib/onboardingSteps";
+import type { SellerType } from "@/lib/sellerTypes";
+import type { StepConfig } from "@/lib/onboardingSteps";
 
 type Role = "buyer" | "seller";
-type PricingModel = "subscription" | "percentage";
-type SubscriptionPlan = "starter" | "professional" | "enterprise";
-type PercentagePlan = "basic" | "growth" | "scale";
-type SellerPlan = SubscriptionPlan | PercentagePlan;
-type MobileNetwork = "MPESA" | "TIGOPESA" | "AIRTELMONEY" | "HALOPESA";
 
 interface OnboardingData {
   role: Role | null;
   // Buyer fields
   interests: string[];
-  // Seller fields
-  businessName: string;
-  businessDescription: string;
-  businessAddress: string;
-  phoneNumber: string;
-  pricingModel: PricingModel;
-  plan: SellerPlan;
-  paymentNetwork?: MobileNetwork;
+  // Seller fields - dynamic based on seller type
+  sellerType: SellerType | null;
+  [key: string]: any; // Allow dynamic fields from step configurations
 }
-
-const mobileNetworks: { id: MobileNetwork; name: string; color: string; description?: string }[] = [
-  { id: "MPESA", name: "M-Pesa", color: "bg-green-500", description: "Vodacom" },
-  { id: "TIGOPESA", name: "Tigo Pesa", color: "bg-blue-500", description: "Mix By Yas" },
-  { id: "AIRTELMONEY", name: "Airtel Money", color: "bg-red-500" },
-  { id: "HALOPESA", name: "Halopesa", color: "bg-orange-500" },
-];
 
 const buyerInterests = [
   { id: "electronics", label: "Electronics", icon: "💻" },
@@ -72,194 +47,62 @@ const buyerInterests = [
   { id: "art", label: "Art & Crafts", icon: "🎨" },
 ];
 
-const subscriptionPlans = [
-  {
-    id: "starter" as SubscriptionPlan,
-    name: "Starter",
-    price: 25000,
-    priceLabel: "25,000 TZS",
-    period: "/month",
-    description: "Perfect for individuals just getting started",
-    features: [
-      "Up to 25 product listings",
-      "Basic analytics dashboard",
-      "Standard support",
-      "5% transaction fee",
-      "Access to marketplace",
-    ],
-    icon: Zap,
-    popular: false,
-  },
-  {
-    id: "professional" as SubscriptionPlan,
-    name: "Professional",
-    price: 75000,
-    priceLabel: "75,000 TZS",
-    period: "/month",
-    description: "For growing businesses and serious sellers",
-    features: [
-      "Up to 500 product listings",
-      "Advanced analytics & reports",
-      "Priority support",
-      "3% transaction fee",
-      "Custom storefront domain",
-      "Marketing tools included",
-      "Bulk product upload",
-    ],
-    icon: TrendingUp,
-    popular: true,
-  },
-  {
-    id: "enterprise" as SubscriptionPlan,
-    name: "Enterprise",
-    price: 250000,
-    priceLabel: "250,000 TZS",
-    period: "/month",
-    description: "For large businesses with custom needs",
-    features: [
-      "Unlimited product listings",
-      "Full analytics suite",
-      "Dedicated account manager",
-      "1% transaction fee",
-      "API access",
-      "White-label options",
-      "SLA guarantee",
-    ],
-    icon: Crown,
-    popular: false,
-  },
-];
-
-const percentagePlans = [
-  {
-    id: "basic" as PercentagePlan,
-    name: "Basic",
-    price: 7,
-    priceLabel: "7%",
-    period: "per sale",
-    description: "Pay only when you sell",
-    features: [
-      "Up to 50 product listings",
-      "Basic analytics",
-      "Community support",
-      "No monthly fees",
-      "Access to marketplace",
-    ],
-    icon: Zap,
-    popular: false,
-  },
-  {
-    id: "growth" as PercentagePlan,
-    name: "Growth",
-    price: 10,
-    priceLabel: "10%",
-    period: "per sale",
-    description: "For active sellers with regular sales",
-    features: [
-      "Up to 200 product listings",
-      "Advanced analytics",
-      "Email support",
-      "Priority placement",
-      "Marketing tools",
-      "Promotional features",
-    ],
-    icon: TrendingUp,
-    popular: true,
-  },
-  {
-    id: "scale" as PercentagePlan,
-    name: "Scale",
-    price: 15,
-    priceLabel: "15%",
-    period: "per sale",
-    description: "For high-volume sellers",
-    features: [
-      "Unlimited listings",
-      "Full analytics suite",
-      "Priority support",
-      "Featured placement",
-      "Custom integrations",
-      "Dedicated success manager",
-      "Early access to features",
-    ],
-    icon: Crown,
-    popular: false,
-  },
-];
-
 export default function Onboarding() {
   const { user, loading, becomeSeller } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { status: onboardingStatus, loading: onboardingLoading, completeStep, completeOnboarding, getSteps } = useOnboardingStatus();
-  const [step, setStep] = useState(1);
+  const {
+    status: onboardingStatus,
+    loading: onboardingLoading,
+    completeStep,
+    completeOnboarding,
+    getSteps,
+  } = useOnboardingStatus();
+
+  // Buyer flow state
+  const [buyerStep, setBuyerStep] = useState(1);
+  
+  // Seller flow state - using new multi-profile system
+  const [sellerStepIndex, setSellerStepIndex] = useState(0);
+  const [sellerSteps, setSellerSteps] = useState<StepConfig[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [pricingModel, setPricingModel] = useState<PricingModel>("subscription");
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "completed" | "failed" | null>(null);
-  const [pollCount, setPollCount] = useState(0);
   const pollCountRef = useRef(0);
-  
+
   // Get role from location state (if coming from email verification or direct navigation)
   const roleFromState = location.state?.role as Role | undefined;
-  
-  // Determine starting step based on onboarding status
-  useEffect(() => {
-    if (!onboardingLoading && onboardingStatus) {
-      const steps = getSteps();
-      if (steps.length > 0) {
-        // Find the index of the first step that needs to be completed
-        const firstIncompleteStep = steps[0];
-        // Map step ID to step number (this will need to be adjusted based on your step structure)
-        // For now, if user has active pricing plan, start from where they left off
-        if (onboardingStatus.hasActivePricingPlan && onboardingStatus.nextStep) {
-          // User has pricing plan but needs to complete remaining steps
-          // We'll handle this in the step rendering logic
-        }
-      }
-    }
-  }, [onboardingLoading, onboardingStatus, getSteps]);
-  
+
   const [data, setData] = useState<OnboardingData>({
     role: roleFromState || null,
     interests: [],
-    businessName: "",
-    businessDescription: "",
-    businessAddress: "",
-    phoneNumber: "",
-    pricingModel: "subscription",
-    plan: "professional",
-    paymentNetwork: "MPESA", // Default to M-Pesa
+    sellerType: null,
   });
-
-  const currentPlans = pricingModel === "subscription" ? subscriptionPlans : percentagePlans;
-
-  const totalSteps = data.role === "seller" ? 4 : 3;
 
   // Check for OAuth errors in URL
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const error = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
-    
+
     if (error) {
       let errorMessage = "Authentication failed. Please try again.";
-      
+
       if (error === "server_error" && errorDescription?.includes("Unable to exchange external code")) {
-        errorMessage = "OAuth authentication failed. The redirect URL may not be configured correctly. Please contact support or try signing in with email and password.";
+        errorMessage =
+          "OAuth authentication failed. The redirect URL may not be configured correctly. Please contact support or try signing in with email and password.";
       } else if (errorDescription) {
         errorMessage = decodeURIComponent(errorDescription);
       }
-      
+
       toast({
         title: "Authentication Error",
         description: errorMessage,
         variant: "destructive",
       });
-      
-      // Clean up URL
+
       navigate("/onboarding", { replace: true });
     }
   }, [location.search, navigate, toast]);
@@ -271,11 +114,12 @@ export default function Onboarding() {
   }, [user, loading, navigate]);
 
   // Check if user has already completed onboarding - redirect to dashboard
-  // This prevents re-triggering onboarding for users with onboarding_completed = true
   useEffect(() => {
     if (!onboardingLoading && onboardingStatus) {
-      // If onboarding is marked as complete with current version, redirect to dashboard
-      if (onboardingStatus.isComplete && onboardingStatus.onboardingVersion >= onboardingStatus.requiredVersion) {
+      if (
+        onboardingStatus.isComplete &&
+        onboardingStatus.onboardingVersion >= onboardingStatus.requiredVersion
+      ) {
         toast({
           title: "Onboarding Already Complete",
           description: "You have already completed onboarding. Redirecting to dashboard...",
@@ -286,36 +130,37 @@ export default function Onboarding() {
     }
   }, [onboardingLoading, onboardingStatus, navigate, toast]);
 
-  // Handle conditional onboarding logic based on user status
+  // Initialize seller steps when seller type is selected or status is loaded
   useEffect(() => {
-    if (!onboardingLoading && onboardingStatus && user) {
-      // If user has active pricing plan but incomplete onboarding, skip to remaining steps
-      if (onboardingStatus.hasActivePricingPlan && onboardingStatus.sellerType) {
-        // User has pricing plan - they may need to complete other steps
-        const steps = getSteps();
-        if (steps.length > 0 && !steps.includes("pricing") && !steps.includes("payment")) {
-          // Skip pricing/payment steps, start from first incomplete step
-          // This will be handled by the step rendering logic
+    if (data.role === "seller" && !onboardingLoading) {
+      const stepIds = getSteps();
+      
+      if (stepIds.length > 0) {
+        // Convert step IDs to StepConfig objects
+        const stepConfigs = stepIds
+          .map((stepId) => getStepConfig(stepId as StepId))
+          .filter((config) => config !== undefined) as StepConfig[];
+        
+        setSellerSteps(stepConfigs);
+        
+        // If user already has seller type, set it
+        if (onboardingStatus?.sellerType && !data.sellerType) {
+          setData((prev) => ({ ...prev, sellerType: onboardingStatus.sellerType }));
         }
       }
-      
-      // If role is provided from state, skip role selection
-      if (roleFromState && data.role === roleFromState && step === 1) {
-        setStep(2);
-      }
-      
-      // If user already has seller type, set it in data
-      if (onboardingStatus.sellerType && !data.role) {
-        setData({ ...data, role: "seller" });
-      }
     }
-  }, [onboardingLoading, onboardingStatus, roleFromState, data.role, step, user, getSteps]);
+  }, [data.role, onboardingLoading, onboardingStatus, getSteps]);
 
+  // Handle role selection
   const handleRoleSelect = (role: Role) => {
     setData({ ...data, role });
-    setStep(2);
+    if (role === "buyer") {
+      setBuyerStep(2);
+    }
+    // For seller, steps will be initialized by useEffect above
   };
 
+  // Buyer flow handlers
   const toggleInterest = (interest: string) => {
     setData((prev) => ({
       ...prev,
@@ -325,24 +170,188 @@ export default function Onboarding() {
     }));
   };
 
-  const handlePlanSelect = (plan: SellerPlan) => {
-    setData({ ...data, plan, pricingModel });
+  const handleBuyerComplete = async () => {
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          bio: `Interests: ${data.interests.join(", ")}`,
+        })
+        .eq("id", user?.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Welcome to Blinno!",
+        description: "Discover amazing products tailored for you.",
+      });
+      navigate("/buyer");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handlePricingModelChange = (model: PricingModel) => {
-    setPricingModel(model);
-    // Reset plan to the popular one in the new model
-    const defaultPlan = model === "subscription" ? "professional" : "growth";
-    setData({ ...data, pricingModel: model, plan: defaultPlan });
+  // Seller flow handlers
+  const handleSellerFieldChange = (fieldId: string, value: any) => {
+    setData((prev) => ({ ...prev, [fieldId]: value }));
+    
+    // Special handling for seller type selection
+    if (fieldId === "sellerType" && value) {
+      // Reload steps for the selected seller type
+      const stepIds = getSteps();
+      const stepConfigs = stepIds
+        .map((stepId) => getStepConfig(stepId as StepId))
+        .filter((config) => config !== undefined) as StepConfig[];
+      setSellerSteps(stepConfigs);
+      setSellerStepIndex(0);
+    }
   };
 
-  const handlePayment = async () => {
-    // Percentage plans have no upfront payment
-    if (data.pricingModel === "percentage") {
-      await handleComplete();
+  // Complete seller onboarding - defined early so it can be used in other callbacks
+  const handleSellerComplete = useCallback(async () => {
+    setIsSubmitting(true);
+
+    try {
+      // Add seller role
+      const { error: roleError } = await becomeSeller();
+      if (roleError) throw roleError;
+
+      // Create subscription if subscription model
+      if (data.pricingModel === "subscription" && paymentStatus === "completed") {
+        const subscriptionPrices: Record<string, number> = {
+          starter: 25000,
+          professional: 75000,
+          enterprise: 250000,
+        };
+        const selectedPlan = data.plan;
+        const planPrice = subscriptionPrices[selectedPlan] || 0;
+
+        const { error: subError } = await supabase.from("seller_subscriptions").insert({
+          seller_id: user?.id,
+          plan: `subscription_${selectedPlan}`,
+          price_monthly: planPrice,
+          status: "active",
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          payment_reference: paymentReference,
+        });
+
+        if (subError) throw subError;
+      } else if (data.pricingModel === "percentage") {
+        // Percentage plans don't require payment
+        const { error: subError } = await supabase.from("seller_subscriptions").insert({
+          seller_id: user?.id,
+          plan: `percentage_${data.plan}`,
+          price_monthly: 0,
+          status: "active",
+        });
+
+        if (subError) throw subError;
+      }
+
+      // Mark onboarding as complete
+      if (user?.id && data.sellerType) {
+        const onboardingData = {
+          ...data,
+          completedSteps: sellerSteps.map((s) => s.id),
+        };
+
+        const success = await completeOnboarding(data.sellerType, onboardingData);
+
+        if (!success) {
+          console.error("Failed to mark onboarding as complete");
+          toast({
+            title: "Warning",
+            description:
+              "Onboarding completed but flag may not have been set. Please contact support if you see this message again.",
+            variant: "destructive",
+          });
+        }
+      }
+
+      toast({
+        title: "Welcome to Blinno!",
+        description: "Your seller account is ready. Start listing your products!",
+      });
+      navigate("/seller");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    data,
+    user,
+    becomeSeller,
+    paymentStatus,
+    paymentReference,
+    sellerSteps,
+    completeOnboarding,
+    navigate,
+    toast,
+  ]);
+
+  const handleSellerNext = useCallback(async () => {
+    const currentStep = sellerSteps[sellerStepIndex];
+    if (!currentStep) return;
+
+    // Special handling for payment step - PaymentStep component handles its own buttons
+    // This function should only be called for percentage plans (via onComplete)
+    if (currentStep.id === "payment") {
+      // If percentage plan, complete onboarding
+      if (data.pricingModel === "percentage") {
+        // Mark payment step as completed
+        if (user?.id) {
+          await completeStep(currentStep.id, data);
+        }
+        await handleSellerComplete();
+      }
+      // For subscription plans, PaymentStep will call onPaymentInitiate
       return;
     }
 
+    // Validate current step
+    const validation = validateStep(currentStep.id, data);
+    if (!validation.valid) {
+      toast({
+        title: "Validation Error",
+        description: validation.errors.join(", "),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Mark step as completed
+    if (user?.id) {
+      await completeStep(currentStep.id, data);
+    }
+
+    // Check if this is the last step
+    if (sellerStepIndex < sellerSteps.length - 1) {
+      setSellerStepIndex((prev) => prev + 1);
+    } else {
+      // All steps completed - handle final completion
+      await handleSellerComplete();
+    }
+  }, [sellerStepIndex, sellerSteps, data, user, completeStep, toast, handleSellerComplete]);
+
+  const handleSellerBack = () => {
+    if (sellerStepIndex > 0) {
+      setSellerStepIndex((prev) => prev - 1);
+    }
+  };
+
+  const handlePayment = async () => {
     if (!data.phoneNumber) {
       toast({
         title: "Phone number required",
@@ -363,67 +372,62 @@ export default function Onboarding() {
 
     setIsProcessingPayment(true);
     setPaymentStatus(null);
-    setPollCount(0);
+    pollCountRef.current = 0;
 
     try {
-      const selectedPlan = currentPlans.find((p) => p.id === data.plan);
+      const selectedPlan = data.plan;
+      const subscriptionPrices: Record<string, number> = {
+        starter: 25000,
+        professional: 75000,
+        enterprise: 250000,
+      };
+      const percentagePrices: Record<string, number> = {
+        basic: 7,
+        growth: 10,
+        scale: 15,
+      };
+
+      const planPrice =
+        data.pricingModel === "subscription"
+          ? subscriptionPrices[selectedPlan] || 0
+          : percentagePrices[selectedPlan] || 0;
+
       const reference = `SUB-${user?.id?.slice(0, 8)}-${Date.now()}`;
-      
-      const { data: paymentData, error } = await supabase.functions.invoke(
-        "clickpesa-payment",
-        {
-          body: {
-            action: "initiate",
-            amount: selectedPlan?.price || 0,
-            currency: "TZS",
-            phone_number: data.phoneNumber,
-            network: data.paymentNetwork || "MPESA",
-            reference: reference,
-            description: `Blinno ${selectedPlan?.name} Plan Subscription`,
-          },
-        }
-      );
+
+      const { data: paymentData, error } = await supabase.functions.invoke("clickpesa-payment", {
+        body: {
+          action: "initiate",
+          amount: planPrice,
+          currency: "TZS",
+          phone_number: data.phoneNumber,
+          network: data.paymentNetwork || "MPESA",
+          reference: reference,
+          description: `Blinno ${selectedPlan} Plan Subscription`,
+        },
+      });
 
       if (error) {
-        console.error("Payment function error:", error);
         throw new Error(error.message || "Failed to connect to payment service");
       }
 
-      if (!paymentData) {
-        throw new Error("No response from payment service");
-      }
-
-      if (paymentData.success) {
-        // Store payment reference and start polling
+      if (paymentData?.success) {
         const transactionId = paymentData.data?.transaction_id || paymentData.data?.reference || reference;
         setPaymentReference(transactionId);
         setPaymentStatus("pending");
-        
+
         toast({
           title: "Payment initiated",
-          description: "Check your phone for the M-Pesa prompt. Please approve the payment to continue.",
+          description: "Check your phone for the payment prompt. Please approve the payment to continue.",
         });
-        
-        // Don't complete subscription yet - wait for payment confirmation
+
         setIsProcessingPayment(false);
       } else {
-        const errorMsg = paymentData.error || paymentData.message || "Payment failed";
-        console.error("Payment failed:", paymentData);
-        throw new Error(errorMsg);
+        throw new Error(paymentData?.error || "Payment failed");
       }
     } catch (error: any) {
-      console.error("Payment error:", error);
-      let errorMessage = "Could not process payment. Please try again.";
-      
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.error) {
-        errorMessage = error.error;
-      }
-      
       toast({
         title: "Payment failed",
-        description: errorMessage,
+        description: error.message || "Could not process payment. Please try again.",
         variant: "destructive",
       });
       setPaymentStatus("failed");
@@ -431,115 +435,15 @@ export default function Onboarding() {
     }
   };
 
-  // Complete onboarding and create subscription
-  const handleComplete = useCallback(async () => {
-    setIsSubmitting(true);
-
-    try {
-      if (data.role === "seller") {
-        // Add seller role
-        const { error: roleError } = await becomeSeller();
-        if (roleError) throw roleError;
-
-        // Update profile with business info
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({
-            bio: `${data.businessName}\n${data.businessDescription}`,
-          })
-          .eq("id", user?.id);
-
-        if (profileError) throw profileError;
-
-        // Create subscription record
-        const selectedPlan = currentPlans.find((p) => p.id === data.plan);
-        const isPercentage = data.pricingModel === "percentage";
-        const { error: subError } = await supabase
-          .from("seller_subscriptions")
-          .insert({
-            seller_id: user?.id,
-            plan: `${data.pricingModel}_${data.plan}`,
-            price_monthly: isPercentage ? 0 : (selectedPlan?.price || 0),
-            status: "active",
-            expires_at: isPercentage 
-              ? null 
-              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          });
-
-        if (subError) throw subError;
-
-        // Mark onboarding as complete using the new system
-        // This sets the persistent flag that prevents re-triggering
-        if (user?.id) {
-          const sellerType = onboardingStatus?.sellerType || "individual";
-          const allCompletedSteps = [...(onboardingStatus?.completedSteps || []), "pricing", "payment"];
-          
-          const onboardingData = {
-            businessName: data.businessName,
-            businessDescription: data.businessDescription,
-            businessAddress: data.businessAddress,
-            phoneNumber: data.phoneNumber,
-            pricingModel: data.pricingModel,
-            plan: data.plan,
-            paymentNetwork: data.paymentNetwork,
-            completedSteps: allCompletedSteps,
-          };
-
-          const success = await completeOnboarding(sellerType, onboardingData);
-          
-          if (!success) {
-            console.error("Failed to mark onboarding as complete");
-            toast({
-              title: "Warning",
-              description: "Onboarding completed but flag may not have been set. Please contact support if you see this message again.",
-              variant: "destructive",
-            });
-          }
-        }
-
-        toast({
-          title: "Welcome to Blinno!",
-          description: "Your seller account is ready. Start listing your products!",
-        });
-        navigate("/seller");
-      } else {
-        // Update buyer interests in profile
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-            bio: `Interests: ${data.interests.join(", ")}`,
-          })
-          .eq("id", user?.id);
-
-        if (error) throw error;
-
-        toast({
-          title: "Welcome to Blinno!",
-          description: "Discover amazing products tailored for you.",
-        });
-        navigate("/buyer");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Something went wrong",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [data, user, becomeSeller, currentPlans, navigate, toast]);
-
   // Check payment status
   const checkPaymentStatus = useCallback(async () => {
     if (!paymentReference || paymentStatus !== "pending") return;
 
     try {
-      const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
+      const { data: statusData, error } = await supabase.functions.invoke("clickpesa-payment", {
         body: {
           action: "check-status",
           reference: paymentReference,
-          transaction_id: paymentReference,
         },
       });
 
@@ -548,15 +452,21 @@ export default function Onboarding() {
         return;
       }
 
-      if (data?.data?.status === "COMPLETED" || data?.data?.status === "PAYMENT_RECEIVED") {
+      if (
+        statusData?.data?.status === "COMPLETED" ||
+        statusData?.data?.status === "PAYMENT_RECEIVED"
+      ) {
         setPaymentStatus("completed");
         toast({
           title: "Payment confirmed!",
           description: "Your subscription is being activated...",
         });
-        // Now complete the subscription
-        await handleComplete();
-      } else if (data?.data?.status === "FAILED" || data?.data?.status === "CANCELLED" || data?.data?.status === "PAYMENT_FAILED") {
+        await handleSellerComplete();
+      } else if (
+        statusData?.data?.status === "FAILED" ||
+        statusData?.data?.status === "CANCELLED" ||
+        statusData?.data?.status === "PAYMENT_FAILED"
+      ) {
         setPaymentStatus("failed");
         toast({
           title: "Payment failed",
@@ -568,26 +478,20 @@ export default function Onboarding() {
     } catch (error) {
       console.error("Error checking payment status:", error);
     }
-  }, [paymentReference, paymentStatus, toast, handleComplete]);
+  }, [paymentReference, paymentStatus, toast, handleSellerComplete]);
 
-  // Poll for payment status every 5 seconds, up to 24 times (2 minutes)
+  // Poll for payment status
   useEffect(() => {
     if (!paymentReference || paymentStatus !== "pending") {
-      // Reset poll count when not polling
       pollCountRef.current = 0;
-      setPollCount(0);
       return;
     }
 
-    // Reset poll count when starting new polling session
     pollCountRef.current = 0;
-    setPollCount(0);
 
     const interval = setInterval(async () => {
       pollCountRef.current += 1;
-      setPollCount(pollCountRef.current);
-      
-      // Check if we've exceeded the limit (after 24 checks = 2 minutes)
+
       if (pollCountRef.current > 24) {
         clearInterval(interval);
         setPaymentStatus("failed");
@@ -606,7 +510,8 @@ export default function Onboarding() {
     return () => clearInterval(interval);
   }, [paymentReference, paymentStatus, checkPaymentStatus, toast]);
 
-  if (loading) {
+
+  if (loading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -614,125 +519,95 @@ export default function Onboarding() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
-      <div className="w-full max-w-3xl">
-        {/* Progress */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-2 rounded-full transition-all ${
-                i + 1 <= step ? "w-12 bg-primary" : "w-8 bg-muted"
-              }`}
-            />
-          ))}
-        </div>
+  // Buyer onboarding flow (simple, unchanged)
+  if (data.role === "buyer") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
+        <div className="w-full max-w-3xl">
+          <div className="flex items-center justify-center gap-2 mb-8">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className={`h-2 rounded-full transition-all ${
+                  i <= buyerStep ? "w-12 bg-primary" : "w-8 bg-muted"
+                }`}
+              />
+            ))}
+          </div>
 
-        <AnimatePresence mode="wait">
-          {/* Step 1: Role Selection */}
-          {step === 1 && (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-4">
-                  Step 1 of {totalSteps}
-                </Badge>
-                <h1 className="text-3xl font-bold text-foreground mb-2">
-                  How will you use Blinno?
-                </h1>
-                <p className="text-muted-foreground">
-                  Choose your primary role. You can always change this later.
-                </p>
-              </div>
+          <AnimatePresence mode="wait">
+            {/* Step 1: Role Selection */}
+            {buyerStep === 1 && (
+              <motion.div
+                key="role-selection"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="text-center">
+                  <Badge variant="secondary" className="mb-4">
+                    Step 1 of 3
+                  </Badge>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">
+                    How will you use Blinno?
+                  </h1>
+                  <p className="text-muted-foreground">
+                    Choose your primary role. You can always change this later.
+                  </p>
+                </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <Card
-                  className="cursor-pointer border-2 hover:border-primary/50 transition-all group"
-                  onClick={() => handleRoleSelect("buyer")}
-                >
-                  <CardContent className="p-6 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 transition-colors">
-                      <ShoppingBag className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-foreground mb-2">
-                      I want to Buy
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      Discover and purchase amazing products from sellers across
-                      Tanzania
-                    </p>
-                    <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Heart className="w-3 h-3" /> Save favorites
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Package className="w-3 h-3" /> Track orders
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <Card
+                    className="cursor-pointer border-2 hover:border-primary/50 transition-all group"
+                    onClick={() => handleRoleSelect("buyer")}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 transition-colors">
+                        <ShoppingBag className="w-8 h-8 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-foreground mb-2">I want to Buy</h3>
+                      <p className="text-muted-foreground text-sm">
+                        Discover and purchase amazing products from sellers across Tanzania
+                      </p>
+                    </CardContent>
+                  </Card>
 
-                <Card
-                  className="cursor-pointer border-2 hover:border-primary/50 transition-all group"
-                  onClick={() => handleRoleSelect("seller")}
-                >
-                  <CardContent className="p-6 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 transition-colors">
-                      <Store className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-foreground mb-2">
-                      I want to Sell
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      Start your online business and reach customers across
-                      Tanzania
-                    </p>
-                    <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" /> Grow sales
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> Easy setup
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </motion.div>
-          )}
+                  <Card
+                    className="cursor-pointer border-2 hover:border-primary/50 transition-all group"
+                    onClick={() => handleRoleSelect("seller")}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 transition-colors">
+                        <Store className="w-8 h-8 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-foreground mb-2">I want to Sell</h3>
+                      <p className="text-muted-foreground text-sm">
+                        Start your online business and reach customers across Tanzania
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </motion.div>
+            )}
 
-          {/* Step 2: Role-specific info */}
-          {step === 2 && (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-4">
-                  Step 2 of {totalSteps}
-                </Badge>
-                <h1 className="text-3xl font-bold text-foreground mb-2">
-                  {data.role === "buyer"
-                    ? "What interests you?"
-                    : "Tell us about your business"}
-                </h1>
-                <p className="text-muted-foreground">
-                  {data.role === "buyer"
-                    ? "Select categories you're interested in"
-                    : "This helps customers find and trust your store"}
-                </p>
-              </div>
+            {/* Step 2: Buyer Interests */}
+            {buyerStep === 2 && (
+              <motion.div
+                key="buyer-interests"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="text-center">
+                  <Badge variant="secondary" className="mb-4">
+                    Step 2 of 3
+                  </Badge>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">What interests you?</h1>
+                  <p className="text-muted-foreground">Select categories you're interested in</p>
+                </div>
 
-              {data.role === "buyer" ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {buyerInterests.map((interest) => (
                     <Card
@@ -745,9 +620,7 @@ export default function Onboarding() {
                       onClick={() => toggleInterest(interest.id)}
                     >
                       <CardContent className="p-4 text-center">
-                        <span className="text-2xl mb-2 block">
-                          {interest.icon}
-                        </span>
+                        <span className="text-2xl mb-2 block">{interest.icon}</span>
                         <span className="text-sm font-medium text-foreground">
                           {interest.label}
                         </span>
@@ -758,402 +631,66 @@ export default function Onboarding() {
                     </Card>
                   ))}
                 </div>
-              ) : (
-                <Card>
-                  <CardContent className="p-6 space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="businessName" className="flex items-center gap-2">
-                        <Building className="w-4 h-4" /> Business Name
-                      </Label>
-                      <Input
-                        id="businessName"
-                        placeholder="Your Store Name"
-                        value={data.businessName}
-                        onChange={(e) =>
-                          setData({ ...data, businessName: e.target.value })
-                        }
-                      />
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Business Description</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Tell customers what you sell..."
-                        value={data.businessDescription}
-                        onChange={(e) =>
-                          setData({ ...data, businessDescription: e.target.value })
-                        }
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="address" className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" /> Business Address
-                      </Label>
-                      <Input
-                        id="address"
-                        placeholder="City, Region"
-                        value={data.businessAddress}
-                        onChange={(e) =>
-                          setData({ ...data, businessAddress: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="flex items-center gap-2">
-                        <Phone className="w-4 h-4" /> Phone Number (for payments)
-                      </Label>
-                      <Input
-                        id="phone"
-                        placeholder="+255 XXX XXX XXX"
-                        value={data.phoneNumber}
-                        onChange={(e) =>
-                          setData({ ...data, phoneNumber: e.target.value })
-                        }
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="flex justify-between">
-                <Button variant="ghost" onClick={() => setStep(1)}>
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Back
-                </Button>
-                <Button
-                  onClick={() => setStep(3)}
-                  disabled={
-                    data.role === "buyer"
-                      ? data.interests.length === 0
-                      : !data.businessName
-                  }
-                >
-                  Continue <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 3: Plan Selection (Seller only) or Confirmation (Buyer) */}
-          {step === 3 && data.role === "seller" && (
-            <motion.div
-              key="step3-seller"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-4">
-                  Step 3 of {totalSteps}
-                </Badge>
-                <h1 className="text-3xl font-bold text-foreground mb-2">
-                  Choose how you want to grow
-                </h1>
-                <p className="text-muted-foreground">
-                  Flexible pricing models to fit your business needs
-                </p>
-              </div>
-
-              {/* Pricing Toggle */}
-              <div className="flex justify-center">
-                <Tabs value={pricingModel} onValueChange={(v) => handlePricingModelChange(v as PricingModel)} className="w-full max-w-md">
-                  <TabsList className="grid w-full grid-cols-2 bg-muted">
-                    <TabsTrigger value="subscription" className="gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-                      <CreditCard className="h-4 w-4" />
-                      Subscription
-                    </TabsTrigger>
-                    <TabsTrigger value="percentage" className="gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-                      <Percent className="h-4 w-4" />
-                      Per Sale
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                {currentPlans.map((plan) => {
-                  const Icon = plan.icon;
-                  return (
-                    <Card
-                      key={plan.id}
-                      className={`cursor-pointer border-2 transition-all relative ${
-                        data.plan === plan.id
-                          ? "border-primary bg-primary/5"
-                          : "hover:border-primary/30"
-                      }`}
-                      onClick={() => handlePlanSelect(plan.id)}
-                    >
-                      {plan.popular && (
-                        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary">
-                          Most Popular
-                        </Badge>
-                      )}
-                      <CardContent className="p-6">
-                        <div className="text-center mb-4">
-                          <div
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 ${
-                              data.plan === plan.id
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
-                          >
-                            <Icon className="w-6 h-6" />
-                          </div>
-                          <h3 className="font-semibold text-foreground">
-                            {plan.name}
-                          </h3>
-                          <p className="text-2xl font-bold text-foreground mt-1">
-                            {plan.priceLabel}
-                            <span className="text-sm font-normal text-muted-foreground ml-1">
-                              {plan.period}
-                            </span>
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {plan.description}
-                          </p>
-                        </div>
-
-                        <ul className="space-y-2 text-sm">
-                          {plan.features.map((feature, i) => (
-                            <li
-                              key={i}
-                              className="flex items-center gap-2 text-muted-foreground"
-                            >
-                              <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
-
-                        {data.plan === plan.id && (
-                          <div className="mt-4 text-center">
-                            <Badge variant="secondary">Selected</Badge>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              {/* Pricing Note */}
-              <p className="text-center text-sm text-muted-foreground">
-                {pricingModel === "subscription" 
-                  ? "All subscription plans include a 14-day free trial. Cancel anytime."
-                  : "No monthly fees. You only pay when you make a sale."
-                }
-              </p>
-
-              <div className="flex justify-between">
-                <Button variant="ghost" onClick={() => setStep(2)}>
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Back
-                </Button>
-                <Button onClick={() => setStep(4)}>
-                  Continue <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 3 for Buyer / Step 4 for Seller: Confirmation */}
-          {((step === 3 && data.role === "buyer") || (step === 4 && data.role === "seller")) && (
-            <motion.div
-              key="confirmation"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-4">
-                  Step {data.role === "buyer" ? 3 : 4} of {totalSteps}
-                </Badge>
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-10 h-10 text-primary" />
+                <div className="flex justify-between">
+                  <Button variant="ghost" onClick={() => setBuyerStep(1)}>
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                  </Button>
+                  <Button
+                    onClick={() => setBuyerStep(3)}
+                    disabled={data.interests.length === 0}
+                  >
+                    Continue <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
                 </div>
-                <h1 className="text-3xl font-bold text-foreground mb-2">
-                  {data.role === "buyer" ? "You're all set!" : "Confirm & Subscribe"}
-                </h1>
-                <p className="text-muted-foreground">
-                  {data.role === "buyer"
-                    ? "Start exploring products tailored just for you"
-                    : data.pricingModel === "percentage"
-                    ? "Start selling with no upfront costs"
-                    : "Complete payment to activate your subscription"}
-                </p>
-              </div>
+              </motion.div>
+            )}
 
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold text-foreground mb-4">Summary</h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Account Type</span>
-                      <span className="font-medium text-foreground capitalize">
-                        {data.role}
-                      </span>
-                    </div>
-                    {data.role === "buyer" ? (
+            {/* Step 3: Buyer Confirmation */}
+            {buyerStep === 3 && (
+              <motion.div
+                key="buyer-confirmation"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="text-center">
+                  <Badge variant="secondary" className="mb-4">
+                    Step 3 of 3
+                  </Badge>
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-10 h-10 text-primary" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">You're all set!</h1>
+                  <p className="text-muted-foreground">
+                    Start exploring products tailored just for you
+                  </p>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold text-foreground mb-4">Summary</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Account Type</span>
+                        <span className="font-medium text-foreground capitalize">Buyer</span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Interests</span>
                         <span className="font-medium text-foreground">
                           {data.interests.length} selected
                         </span>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Business</span>
-                          <span className="font-medium text-foreground">
-                            {data.businessName}
-                          </span>
-                        </div>
-                        {data.businessAddress && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Location</span>
-                            <span className="font-medium text-foreground">
-                              {data.businessAddress}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Pricing Model</span>
-                          <span className="font-medium text-foreground capitalize">
-                            {data.pricingModel === "subscription" ? "Monthly Subscription" : "Per Sale"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Plan</span>
-                          <span className="font-medium text-foreground">
-                            {currentPlans.find((p) => p.id === data.plan)?.name}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-3 mt-3">
-                          <span className="text-foreground font-medium">
-                            {data.pricingModel === "subscription" ? "Monthly Cost" : "Commission Rate"}
-                          </span>
-                          <span className="font-bold text-foreground">
-                            {currentPlans.find((p) => p.id === data.plan)?.priceLabel}
-                            <span className="text-sm font-normal text-muted-foreground ml-1">
-                              {currentPlans.find((p) => p.id === data.plan)?.period}
-                            </span>
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {data.role === "seller" && data.pricingModel === "subscription" && (
-                <>
-                  {paymentStatus === "pending" ? (
-                    <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                      <CardContent className="p-6 text-center">
-                        <div className="flex items-center justify-center mb-4">
-                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                        </div>
-                        <h3 className="font-semibold text-foreground mb-2">Waiting for Payment</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Check your phone ({data.phoneNumber}) for the {mobileNetworks.find(n => n.id === data.paymentNetwork)?.name || "mobile money"} prompt and approve the payment.
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          This page will automatically update when payment is confirmed.
-                        </p>
-                        {pollCount > 0 && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Checking payment status... ({pollCount}/24)
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ) : paymentStatus === "failed" ? (
-                    <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
-                      <CardContent className="p-6 text-center">
-                        <h3 className="font-semibold text-foreground mb-2">Payment Failed</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          The payment was not successful. Please try again.
-                        </p>
-                        <Button onClick={handlePayment} variant="outline" size="sm">
-                          Retry Payment
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card>
-                      <CardContent className="p-6 space-y-4">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Select Payment Method</Label>
-                          <RadioGroup
-                            value={data.paymentNetwork || "MPESA"}
-                            onValueChange={(value) => setData({ ...data, paymentNetwork: value as MobileNetwork })}
-                            className="grid grid-cols-2 gap-3"
-                          >
-                            {mobileNetworks.map((network) => {
-                              const isDisabled = isProcessingPayment || paymentStatus === "pending";
-                              return (
-                                <div key={network.id}>
-                                  <RadioGroupItem
-                                    value={network.id}
-                                    id={network.id}
-                                    className="peer sr-only"
-                                    disabled={isDisabled}
-                                  />
-                                  <Label
-                                    htmlFor={network.id}
-                                    className={`flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-3 transition-all ${
-                                      isDisabled
-                                        ? "cursor-not-allowed opacity-50"
-                                        : "hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                                    } peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary`}
-                                  >
-                                    <div className={`h-8 w-8 rounded-full ${network.color} flex items-center justify-center mb-1`}>
-                                      <Phone className="h-4 w-4 text-white" />
-                                    </div>
-                                    <span className="font-medium text-sm">{network.name}</span>
-                                    {network.description && (
-                                      <span className="text-xs text-muted-foreground">{network.description}</span>
-                                    )}
-                                  </Label>
-                                </div>
-                              );
-                            })}
-                          </RadioGroup>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="payment-phone" className="text-sm font-medium">
-                            Mobile Money Number
-                          </Label>
-                          <Input
-                            id="payment-phone"
-                            placeholder="+255 XXX XXX XXX"
-                            value={data.phoneNumber}
-                            onChange={(e) => setData({ ...data, phoneNumber: e.target.value })}
-                            disabled={isProcessingPayment || paymentStatus === "pending"}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Payment will be processed via {mobileNetworks.find(n => n.id === data.paymentNetwork)?.name || "selected network"}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </>
-              )}
-
-              <div className="flex justify-between">
-                <Button
-                  variant="ghost"
-                  onClick={() => setStep(data.role === "buyer" ? 2 : 3)}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Back
-                </Button>
-                {data.role === "buyer" ? (
-                  <Button onClick={handleComplete} disabled={isSubmitting}>
+                <div className="flex justify-between">
+                  <Button variant="ghost" onClick={() => setBuyerStep(2)}>
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                  </Button>
+                  <Button onClick={handleBuyerComplete} disabled={isSubmitting}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1165,36 +702,160 @@ export default function Onboarding() {
                       </>
                     )}
                   </Button>
-                ) : (
-                  <Button
-                    onClick={handlePayment}
-                    disabled={isSubmitting || isProcessingPayment || paymentStatus === "pending"}
-                  >
-                    {isSubmitting || isProcessingPayment ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {isProcessingPayment ? "Initiating payment..." : "Setting up..."}
-                      </>
-                    ) : paymentStatus === "pending" ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Waiting for payment...
-                      </>
-                    ) : data.pricingModel === "percentage" ? (
-                      <>
-                        Get Started <ArrowRight className="w-4 h-4 ml-2" />
-                      </>
-                    ) : (
-                      <>
-                        Pay & Subscribe <ArrowRight className="w-4 h-4 ml-2" />
-                      </>
-                    )}
-                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
+  // Seller onboarding flow (using new multi-profile system)
+  if (data.role === "seller") {
+    const currentStep = sellerSteps[sellerStepIndex];
+    const totalSellerSteps = sellerSteps.length;
+
+    // If no steps loaded yet, show loading or role selection
+    if (sellerSteps.length === 0) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-muted/30">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
+        <div className="w-full max-w-3xl">
+          {/* Progress */}
+          <div className="flex items-center justify-center gap-2 mb-8">
+            {sellerSteps.map((_, i) => (
+              <div
+                key={i}
+                className={`h-2 rounded-full transition-all ${
+                  i <= sellerStepIndex ? "w-12 bg-primary" : "w-8 bg-muted"
+                }`}
+              />
+            ))}
+          </div>
+
+          <AnimatePresence mode="wait">
+            {currentStep && (
+              <motion.div
+                key={currentStep.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="text-center">
+                  <Badge variant="secondary" className="mb-4">
+                    Step {sellerStepIndex + 1} of {totalSellerSteps}
+                  </Badge>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">{currentStep.title}</h1>
+                  <p className="text-muted-foreground">{currentStep.description}</p>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <StepRenderer
+                      step={currentStep}
+                      data={data}
+                      sellerType={data.sellerType}
+                      onChange={handleSellerFieldChange}
+                      onNext={handleSellerNext}
+                      onBack={sellerStepIndex > 0 ? handleSellerBack : undefined}
+                      onPaymentInitiate={handlePayment}
+                      paymentStatus={paymentStatus}
+                      isProcessingPayment={isProcessingPayment}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Payment status display (if on payment step) */}
+                {currentStep.id === "payment" && paymentStatus === "pending" && (
+                  <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <CardContent className="p-6 text-center">
+                      <div className="flex items-center justify-center mb-4">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      </div>
+                      <h3 className="font-semibold text-foreground mb-2">Waiting for Payment</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Check your phone ({data.phoneNumber}) for the payment prompt and approve the
+                        payment.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        This page will automatically update when payment is confirmed.
+                      </p>
+                    </CardContent>
+                  </Card>
                 )}
+
+                {currentStep.id === "payment" && paymentStatus === "failed" && (
+                  <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
+                    <CardContent className="p-6 text-center">
+                      <h3 className="font-semibold text-foreground mb-2">Payment Failed</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        The payment was not successful. Please try again.
+                      </p>
+                      <Button onClick={handlePayment} variant="outline" size="sm">
+                        Retry Payment
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
+  // Initial role selection (when role is null)
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
+      <div className="w-full max-w-3xl">
+        <div className="text-center mb-8">
+          <Badge variant="secondary" className="mb-4">Step 1</Badge>
+          <h1 className="text-3xl font-bold text-foreground mb-2">How will you use Blinno?</h1>
+          <p className="text-muted-foreground">
+            Choose your primary role. You can always change this later.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card
+            className="cursor-pointer border-2 hover:border-primary/50 transition-all group"
+            onClick={() => handleRoleSelect("buyer")}
+          >
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 transition-colors">
+                <ShoppingBag className="w-8 h-8 text-primary" />
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <h3 className="text-xl font-semibold text-foreground mb-2">I want to Buy</h3>
+              <p className="text-muted-foreground text-sm">
+                Discover and purchase amazing products from sellers across Tanzania
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer border-2 hover:border-primary/50 transition-all group"
+            onClick={() => handleRoleSelect("seller")}
+          >
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 transition-colors">
+                <Store className="w-8 h-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold text-foreground mb-2">I want to Sell</h3>
+              <p className="text-muted-foreground text-sm">
+                Start your online business and reach customers across Tanzania
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

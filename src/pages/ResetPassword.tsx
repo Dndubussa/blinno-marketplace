@@ -10,10 +10,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { validatePassword } from "@/lib/passwordValidation";
+import { PasswordStrengthMeter } from "@/components/ui/password-strength-meter";
 import blinnoLogo from "@/assets/blinno-logo.png";
 
 const resetPasswordSchema = z.object({
-  password: z.string().min(8, "Password must be at least 8 characters").max(100),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(100)
+    .refine(
+      (password) => {
+        const result = validatePassword(password);
+        return result.isValid;
+      },
+      (password) => {
+        const result = validatePassword(password);
+        return { message: result.errors.join(". ") };
+      }
+    ),
   confirmPassword: z.string().min(1, "Please confirm your password"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -23,20 +38,6 @@ const resetPasswordSchema = z.object({
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 // Password strength calculation
-const calculatePasswordStrength = (password: string): { score: number; label: string; color: string } => {
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (password.length >= 12) score++;
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-  if (score <= 1) return { score: 1, label: "Weak", color: "bg-destructive" };
-  if (score <= 2) return { score: 2, label: "Fair", color: "bg-orange-500" };
-  if (score <= 3) return { score: 3, label: "Good", color: "bg-yellow-500" };
-  if (score <= 4) return { score: 4, label: "Strong", color: "bg-green-500" };
-  return { score: 5, label: "Very Strong", color: "bg-green-600" };
-};
 
 export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
@@ -55,7 +56,6 @@ export default function ResetPassword() {
   });
 
   const watchedPassword = form.watch("password");
-  const passwordStrength = calculatePasswordStrength(watchedPassword || "");
 
   // Check if we have a valid session from the reset link
   useEffect(() => {
@@ -156,28 +156,9 @@ export default function ResetPassword() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {/* Password Strength Indicator */}
+                  {/* Password Strength Meter */}
                   {watchedPassword && (
-                    <div className="space-y-1">
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((level) => (
-                          <div
-                            key={level}
-                            className={`h-1.5 flex-1 rounded-full transition-colors ${
-                              level <= passwordStrength.score ? passwordStrength.color : "bg-muted"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <p className={`text-xs ${
-                        passwordStrength.score <= 1 ? "text-destructive" :
-                        passwordStrength.score <= 2 ? "text-orange-500" :
-                        passwordStrength.score <= 3 ? "text-yellow-600" :
-                        "text-green-600"
-                      }`}>
-                        Password strength: {passwordStrength.label}
-                      </p>
-                    </div>
+                    <PasswordStrengthMeter password={watchedPassword} />
                   )}
                   {form.formState.errors.password && (
                     <p className="text-sm text-destructive">

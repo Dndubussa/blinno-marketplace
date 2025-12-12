@@ -8,7 +8,7 @@ const subscriptionPlans = [
   {
     name: "Starter",
     description: "Perfect for individuals just getting started",
-    price: "$9.99",
+    price: "25,000 TZS",
     period: "/month",
     features: [
       "Up to 25 product listings",
@@ -23,7 +23,7 @@ const subscriptionPlans = [
   {
     name: "Professional",
     description: "For growing businesses and serious sellers",
-    price: "$29.99",
+    price: "75,000 TZS",
     period: "/month",
     features: [
       "Up to 500 product listings",
@@ -40,7 +40,7 @@ const subscriptionPlans = [
   {
     name: "Enterprise",
     description: "For large businesses with custom needs",
-    price: "$99.99",
+    price: "250,000 TZS",
     period: "/month",
     features: [
       "Unlimited product listings",
