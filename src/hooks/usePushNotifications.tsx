@@ -18,6 +18,18 @@ export function usePushNotifications() {
     }
   }, []);
 
+  const fetchUnreadCount = useCallback(async () => {
+    if (!user) return;
+
+    const { count } = await supabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("receiver_id", user.id)
+      .eq("is_read", false);
+
+    setUnreadCount(count || 0);
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -62,19 +74,7 @@ export function usePushNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, permission]);
-
-  const fetchUnreadCount = async () => {
-    if (!user) return;
-
-    const { count } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("receiver_id", user.id)
-      .eq("is_read", false);
-
-    setUnreadCount(count || 0);
-  };
+  }, [user, permission, fetchUnreadCount]);
 
   const requestPermission = useCallback(async () => {
     if (!isSupported) {

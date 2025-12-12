@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   CreditCard,
@@ -119,33 +119,8 @@ export default function PaymentAnalytics() {
   const [dailyData, setDailyData] = useState<any[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchPaymentData();
-  }, [timeRange]);
-
-  // Real-time subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel("payment-analytics")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "payment_transactions",
-        },
-        () => {
-          fetchPaymentData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [timeRange]);
-
-  const fetchPaymentData = async () => {
+  // Memoize fetchPaymentData to prevent loops
+  const fetchPaymentData = useCallback(async () => {
     setLoading(true);
     const days = parseInt(timeRange);
     const startDate = subDays(new Date(), days);
@@ -180,7 +155,33 @@ export default function PaymentAnalytics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
+
+  useEffect(() => {
+    fetchPaymentData();
+  }, [fetchPaymentData]);
+
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel("payment-analytics")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payment_transactions",
+        },
+        () => {
+          fetchPaymentData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchPaymentData]);
 
   const processStats = (current: PaymentTransaction[], previous: PaymentTransaction[]) => {
     const totalVolume = current

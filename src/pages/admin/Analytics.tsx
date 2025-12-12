@@ -343,26 +343,8 @@ export default function AdminAnalytics() {
     };
   }, [isLive, addLiveEvent]);
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, [timeRange, dateRange, useCustomRange]);
-
-  useEffect(() => {
-    fetchSchedules();
-  }, []);
-
-  const fetchSchedules = async () => {
-    const { data, error } = await supabase
-      .from("analytics_report_schedules")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setSchedules(data as ReportSchedule[]);
-    }
-  };
-
-  const fetchAnalyticsData = async () => {
+  // Memoize fetchAnalyticsData to prevent loops
+  const fetchAnalyticsData = useCallback(async () => {
     setLoading(true);
     
     let startDate: Date;
@@ -425,7 +407,26 @@ export default function AdminAnalytics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange, dateRange, useCustomRange]);
+
+  const fetchSchedules = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("analytics_report_schedules")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setSchedules(data as ReportSchedule[]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [fetchAnalyticsData]);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]);
 
   const processSellerData = (orderItems: any[], profiles: any[], products: any[], startDate: Date, endDate: Date) => {
     // Group order items by seller

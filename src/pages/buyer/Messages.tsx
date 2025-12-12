@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { MessageSquare, Send, ArrowLeft, Search, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,56 +47,11 @@ export default function BuyerMessages() {
   const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchConversations();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation.id);
-      markMessagesAsRead(selectedConversation.id);
-    }
-  }, [selectedConversation]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Real-time subscription for new messages
-  useEffect(() => {
+  // Memoize functions to prevent loops
+  const fetchConversations = useCallback(async () => {
     if (!user) return;
 
-    const channel = supabase
-      .channel('messages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const newMsg = payload.new as Message;
-          if (selectedConversation && newMsg.conversation_id === selectedConversation.id) {
-            setMessages(prev => [...prev, newMsg]);
-            markMessagesAsRead(selectedConversation.id);
-          }
-          fetchConversations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, selectedConversation]);
-
-  const fetchConversations = async () => {
-    if (!user) return;
-
+    setLoading(true);
     try {
       const { data: convos, error } = await supabase
         .from("conversations")
@@ -147,9 +102,9 @@ export default function BuyerMessages() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchMessages = async (conversationId: string) => {
+  const fetchMessages = useCallback(async (conversationId: string) => {
     const { data, error } = await supabase
       .from("messages")
       .select("*")
@@ -162,9 +117,9 @@ export default function BuyerMessages() {
     }
 
     setMessages(data || []);
-  };
+  }, []);
 
-  const markMessagesAsRead = async (conversationId: string) => {
+  const markMessagesAsRead = useCallback(async (conversationId: string) => {
     if (!user) return;
 
     await supabase
@@ -173,7 +128,54 @@ export default function BuyerMessages() {
       .eq("conversation_id", conversationId)
       .eq("receiver_id", user.id)
       .eq("is_read", false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchConversations();
+    }
+  }, [user, fetchConversations]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id);
+      markMessagesAsRead(selectedConversation.id);
+    }
+  }, [selectedConversation, fetchMessages, markMessagesAsRead]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Real-time subscription for new messages
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('messages-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as Message;
+          if (selectedConversation && newMsg.conversation_id === selectedConversation.id) {
+            setMessages(prev => [...prev, newMsg]);
+            markMessagesAsRead(selectedConversation.id);
+          }
+          fetchConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedConversation, fetchConversations, markMessagesAsRead]);
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || !user) return;

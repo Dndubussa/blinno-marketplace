@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,8 +80,8 @@ export default function BuyerPayments() {
     phone: "",
   });
 
-  // Fetch payment transactions
-  const fetchTransactions = async () => {
+  // Fetch payment transactions - memoized to prevent loops
+  const fetchTransactions = useCallback(async () => {
     if (!user) return;
     
     setIsLoading(true);
@@ -97,11 +97,11 @@ export default function BuyerPayments() {
       setTransactions(data || []);
     }
     setIsLoading(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [user]);
+  }, [fetchTransactions]);
 
   // Real-time subscription for payment updates
   useEffect(() => {
@@ -127,7 +127,7 @@ export default function BuyerPayments() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchTransactions]);
 
   const handleTestPayment = async () => {
     if (!newMethod.network || !newMethod.phone) {

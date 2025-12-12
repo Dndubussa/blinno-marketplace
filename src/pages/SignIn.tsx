@@ -39,27 +39,28 @@ export default function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!loading && user && !justSignedIn) {
-      const redirectPath = getPostLoginRedirectPath(roles, location.state?.from?.pathname);
-      navigate(redirectPath, { replace: true });
-    }
-  }, [user, loading, roles, navigate, location.state, justSignedIn]);
-
   // Handle redirect after successful sign in (once roles are loaded)
+  // Consolidated into single useEffect to prevent duplicate redirects
   useEffect(() => {
-    if (justSignedIn && !loading && user && roles.length > 0) {
-      getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
-        toast({
-          title: "Welcome back!",
-          description: "You have signed in successfully.",
+    if (!loading && user && roles.length > 0) {
+      // Only redirect if we just signed in OR if user is already authenticated and not on a protected route
+      const shouldRedirect = justSignedIn || (!justSignedIn && location.pathname === "/sign-in");
+      
+      if (shouldRedirect) {
+        getPostLoginRedirectPath(user.id, roles, location.state?.from?.pathname).then((redirectPath) => {
+          // Only show toast if we just signed in
+          if (justSignedIn) {
+            toast({
+              title: "Welcome back!",
+              description: "You have signed in successfully.",
+            });
+            setJustSignedIn(false);
+          }
+          navigate(redirectPath, { replace: true });
         });
-        navigate(redirectPath, { replace: true });
-        setJustSignedIn(false);
-      });
+      }
     }
-  }, [justSignedIn, loading, user, roles, navigate, location.state, toast]);
+  }, [justSignedIn, loading, user, roles, navigate, location.pathname, location.state, toast]);
 
   const signInForm = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
