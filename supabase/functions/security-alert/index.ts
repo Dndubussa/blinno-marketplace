@@ -74,18 +74,31 @@ const getAlertContent = (alertType: string, userName: string): { subject: string
   };
 };
 
-const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests FIRST, before any other processing
+serve(async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests FIRST - absolutely before anything else
   if (req.method === "OPTIONS") {
-    const origin = req.headers.get("origin");
-    const corsHeaders = getCorsHeaders(origin);
-    return new Response(null, { 
-      status: 204,
-      headers: {
-        ...corsHeaders,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      }
-    });
+    try {
+      const origin = req.headers.get("origin");
+      const corsHeaders = getCorsHeaders(origin);
+      return new Response(null, { 
+        status: 204,
+        headers: {
+          ...corsHeaders,
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+        }
+      });
+    } catch (error) {
+      // Even if there's an error, return 204 for OPTIONS
+      console.error("Error in OPTIONS handler:", error);
+      return new Response(null, { 
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        }
+      });
+    }
   }
 
   const origin = req.headers.get("origin");
@@ -187,7 +200,6 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error("Error in security-alert function:", error);
-    // corsHeaders is already defined at the top of the handler
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
@@ -199,6 +211,4 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   }
-};
-
-serve(handler);
+});

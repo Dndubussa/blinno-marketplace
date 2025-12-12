@@ -136,9 +136,15 @@ interface PricingStepProps {
 }
 
 export function PricingStep({ data, onChange, onNext, onBack, onSubscribe, isProcessing }: PricingStepProps) {
+  // Ensure pricingModel defaults to "subscription" and is set in data if missing
   const pricingModel = data.pricingModel || "subscription";
   const selectedPlan = data.plan || (pricingModel === "subscription" ? "professional" : "growth");
   const currentPlans = pricingModel === "subscription" ? subscriptionPlans : percentagePlans;
+
+  // Ensure pricingModel is set in data state if it's missing
+  if (!data.pricingModel) {
+    onChange("pricingModel", pricingModel);
+  }
 
   const handleModelChange = (model: PricingModel) => {
     const defaultPlan = model === "subscription" ? "professional" : "growth";
@@ -175,7 +181,13 @@ export function PricingStep({ data, onChange, onNext, onBack, onSubscribe, isPro
                   ? "ring-2 ring-primary shadow-lg"
                   : "hover:shadow-md"
               } ${plan.popular ? "border-primary" : ""}`}
-              onClick={() => onChange("plan", plan.id)}
+              onClick={() => {
+                onChange("plan", plan.id);
+                // Ensure pricingModel is set when a plan is selected
+                if (!data.pricingModel) {
+                  onChange("pricingModel", pricingModel);
+                }
+              }}
             >
               {plan.popular && (
                 <Badge className="absolute top-2 right-2">Popular</Badge>
