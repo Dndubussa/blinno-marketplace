@@ -69,7 +69,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.error("Error fetching profile:", error);
+      // If profile doesn't exist but user is authenticated, try to create it
+      // This handles edge cases where profile was manually deleted
+      if (error.code === "PGRST116" || !data) {
+        // Check if user still exists in auth.users
+        const { data: authUser } = await supabase.auth.getUser();
+        if (authUser?.user?.id === userId) {
+          // User exists in auth but profile is missing - create it
+          try {
+            const { data: newProfile, error: createError } = await supabase
+              .from("profiles")
+              .insert({
+                id: userId,
+                email: authUser.user.email || null,
+                full_name: authUser.user.user_metadata?.full_name || null,
+              })
+              .select()
+              .single();
+
+            if (createError) {
+              console.error("Error creating missing profile:", createError);
+              // If we can't create profile, user might have been deleted
+              // Sign them out to prevent issues
+              if (createError.code === "23503" || createError.message.includes("foreign key")) {
+                toast({
+                  title: "Account Error",
+                  description: "Your account is no longer valid. Please sign in again.",
+                  variant: "destructive",
+                });
+                await signOut();
+              }
+            } else {
+              setProfile(newProfile);
+              // Also ensure default buyer role exists
+              const { data: existingRoles } = await supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", userId);
+              
+              if (!existingRoles || existingRoles.length === 0) {
+                await supabase.from("user_roles").insert({
+                  user_id: userId,
+                  role: "buyer",
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Error recovering profile:", err);
+          }
+        } else {
+          // User doesn't exist in auth.users - sign them out
+          toast({
+            title: "Account Deleted",
+            description: "Your account has been deleted. You have been signed out.",
+            variant: "destructive",
+          });
+          await signOut();
+        }
+      }
       return;
+    }
+
+    // If profile is null but user exists, this is an edge case
+    if (!data && user) {
+      // Double-check if user still exists in auth
+      const { data: authUser } = await supabase.auth.getUser();
+      if (!authUser?.user) {
+        // User was deleted from auth.users - sign out
+        toast({
+          title: "Account Deleted",
+          description: "Your account has been deleted. You have been signed out.",
+          variant: "destructive",
+        });
+        await signOut();
+        return;
+      }
     }
 
     setProfile(data);
@@ -92,9 +166,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+
+        // Handle user deletion or token revocation
+        if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+          // Verify user still exists when token is refreshed
+          if (event === "TOKEN_REFRESHED" && session?.user) {
+            const { data: authUser, error: authError } = await supabase.auth.getUser();
+            if (authError || !authUser?.user) {
+              // User was deleted - clear everything
+              setProfile(null);
+              setRoles([]);
+              setUser(null);
+              setSession(null);
+              toast({
+                title: "Account Deleted",
+                description: "Your account has been deleted. You have been signed out.",
+                variant: "destructive",
+              });
+              setLoading(false);
+              return;
+            }
+          } else {
+            // Normal sign out
+            setProfile(null);
+            setRoles([]);
+          }
+        }
 
         // Defer fetching profile and roles with setTimeout to prevent deadlock
         if (session?.user) {
