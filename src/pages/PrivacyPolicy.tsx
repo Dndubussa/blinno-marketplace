@@ -89,7 +89,7 @@ export default function PrivacyPolicy() {
 
               <h3 className="text-lg font-medium text-foreground mt-6 mb-3">4.2 Service Providers</h3>
               <ul className="list-disc pl-6 text-muted-foreground space-y-2">
-                <li>Payment processors (ClickPesa) for transaction processing</li>
+                <li>Payment processors (Flutterwave) for transaction processing</li>
                 <li>Email service providers for communications</li>
                 <li>Analytics providers for platform improvements</li>
                 <li>Cloud hosting services for data storage</li>

@@ -94,7 +94,7 @@ export default function CookiePolicy() {
               </p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-2">
                 <li>Analytics providers (e.g., Google Analytics)</li>
-                <li>Payment processors (ClickPesa)</li>
+                <li>Payment processors (Flutterwave)</li>
                 <li>Social media platforms</li>
                 <li>Advertising networks</li>
               </ul>

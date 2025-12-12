@@ -190,7 +190,7 @@ export default function BuyerPayments() {
     try {
       const newReference = `RETRY-${tx.reference.replace("RETRY-", "")}-${Date.now()}`;
       
-      const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
+      const { data, error } = await supabase.functions.invoke("flutterwave-payment", {
         body: {
           action: "initiate",
           amount: tx.amount,

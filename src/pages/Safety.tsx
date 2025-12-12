@@ -12,7 +12,7 @@ export default function Safety() {
     {
       icon: Shield,
       title: "Secure Payments",
-      description: "All payments are processed through ClickPesa, a trusted payment provider with industry-standard security.",
+      description: "All payments are processed through Flutterwave, a trusted payment provider with industry-standard security.",
     },
     {
       icon: Lock,

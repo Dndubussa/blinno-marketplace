@@ -269,7 +269,7 @@ export default function Checkout() {
 
     try {
       // Use reference only - backend will look up transaction_id from database
-      const { data, error } = await supabase.functions.invoke("clickpesa-payment", {
+      const { data, error } = await supabase.functions.invoke("flutterwave-payment", {
         body: {
           action: "check-status",
           reference: paymentReference,
