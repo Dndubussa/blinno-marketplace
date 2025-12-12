@@ -8,12 +8,12 @@ import mpesa from "@/assets/partners/mpesa.png";
 import visa from "@/assets/partners/visa.png";
 
 const partners = [
-  { name: "M-Pesa", logo: mpesa },
-  { name: "Visa", logo: visa },
-  { name: "Mastercard", logo: mastercard },
-  { name: "Airtel Money", logo: airtelMoney },
-  { name: "Halopesa", logo: halopesa },
-  { name: "Mixx by Yas", logo: mixxByYas },
+  { name: "M-Pesa", logo: mpesa, size: "large" }, // Twice the size
+  { name: "Visa", logo: visa, size: "normal" },
+  { name: "Mastercard", logo: mastercard, size: "normal" },
+  { name: "Airtel Money", logo: airtelMoney, size: "medium" }, // Once (slightly larger)
+  { name: "Halopesa", logo: halopesa, size: "normal" },
+  { name: "Mixx by Yas", logo: mixxByYas, size: "large" }, // Twice the size
 ];
 
 // Duplicate for seamless loop
@@ -56,18 +56,30 @@ export function PartnersSection() {
           }}
           style={{ width: "fit-content" }}
         >
-          {allPartners.map((partner, index) => (
-            <div
-              key={`${partner.name}-${index}`}
-              className="flex h-16 items-center justify-center px-6 shrink-0"
-            >
-              <img
-                src={partner.logo}
-                alt={partner.name}
-                className="h-12 w-auto max-w-[140px] object-contain opacity-80 hover:opacity-100 transition-opacity duration-300"
-              />
-            </div>
-          ))}
+          {allPartners.map((partner, index) => {
+            // Determine size classes based on partner size
+            const sizeClasses = {
+              large: "h-24 w-auto max-w-[280px]", // Twice the size (2x)
+              medium: "h-16 w-auto max-w-[180px]", // Once (1.33x)
+              normal: "h-12 w-auto max-w-[140px]", // Default size
+            };
+            
+            const size = (partner as typeof partner & { size?: "large" | "medium" | "normal" }).size || "normal";
+            const containerHeight = size === "large" ? "h-28" : size === "medium" ? "h-20" : "h-16";
+            
+            return (
+              <div
+                key={`${partner.name}-${index}`}
+                className={`flex ${containerHeight} items-center justify-center px-6 shrink-0`}
+              >
+                <img
+                  src={partner.logo}
+                  alt={partner.name}
+                  className={`${sizeClasses[size]} object-contain opacity-80 hover:opacity-100 transition-opacity duration-300`}
+                />
+              </div>
+            );
+          })}
         </motion.div>
       </div>
     </section>
