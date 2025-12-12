@@ -50,3 +50,6 @@ verify_jwt = true
 
 [functions.message-notification]
 verify_jwt = false
+
+[functions.sitemap]
+verify_jwt = false
