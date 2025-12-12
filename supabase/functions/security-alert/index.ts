@@ -3,9 +3,24 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+const getCorsHeaders = (origin?: string | null) => {
+  const allowedOrigins = [
+    "https://www.blinno.app",
+    "https://blinno.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ];
+  
+  const allowedOrigin = origin && allowedOrigins.includes(origin) 
+    ? origin 
+    : allowedOrigins[0]; // Default to production origin
+  
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400", // 24 hours
+  };
 };
 
 interface SecurityAlertRequest {
@@ -60,14 +75,14 @@ const getAlertContent = (alertType: string, userName: string): { subject: string
 };
 
 const handler = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { 
       status: 204,
-      headers: {
-        ...corsHeaders,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      }
+      headers: corsHeaders
     });
   }
 
@@ -79,7 +94,13 @@ const handler = async (req: Request): Promise<Response> => {
     if (!email || !alertType) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: email, alertType" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { 
+          status: 400, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json" 
+          } 
+        }
       );
     }
 
@@ -151,13 +172,26 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(
       JSON.stringify({ success: true, emailId: emailResponse.data?.id }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { 
+        status: 200, 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        } 
+      }
     );
   } catch (error: any) {
     console.error("Error in security-alert function:", error);
+    // corsHeaders is already defined at the top of the handler
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { 
+        status: 500, 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        } 
+      }
     );
   }
 };
