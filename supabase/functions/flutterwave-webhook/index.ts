@@ -72,9 +72,10 @@ serve(async (req) => {
     console.log("Flutterwave webhook received:", JSON.stringify(payload, null, 2));
 
     // Verify webhook signature
+    // Flutterwave sends the signature in the 'verifhash' header
     const signature = req.headers.get("verifhash") || req.headers.get("x-flutterwave-signature");
     if (webhookSecret && signature) {
-      const isValid = verifySignature(rawBody, signature, webhookSecret);
+      const isValid = await verifySignature(rawBody, signature, webhookSecret);
       if (!isValid) {
         console.error("Invalid webhook signature");
         return new Response(
@@ -83,6 +84,8 @@ serve(async (req) => {
         );
       }
       console.log("Webhook signature verified successfully");
+    } else if (webhookSecret && !signature) {
+      console.warn("Webhook secret configured but no signature provided - this may be a test request");
     }
 
     // Validate required fields
