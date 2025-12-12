@@ -21,6 +21,7 @@ export default function ProductDetail() {
         .from("products")
         .select("*")
         .eq("id", id)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (error) throw error;
