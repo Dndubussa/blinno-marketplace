@@ -11,6 +11,7 @@ import { usePurchasedProducts } from "@/hooks/usePurchasedProducts";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrency } from "@/hooks/useCurrency";
 import { Currency } from "@/lib/currency";
+import { sanitizeText } from "@/lib/sanitize";
 
 interface Product {
   id: string;
@@ -158,7 +159,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
       <div>
         <h3 className="font-semibold">Description</h3>
         <p className="mt-2 text-muted-foreground leading-relaxed">
-          {product.description || "No description available for this product."}
+          {sanitizeText(product.description) || "No description available for this product."}
         </p>
       </div>
 

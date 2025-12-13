@@ -343,7 +343,7 @@ export default function SellerMessages() {
                               : "bg-muted"
                           }`}
                         >
-                          <p className="text-sm">{msg.content}</p>
+                          <p className="text-sm">{sanitizeText(msg.content)}</p>
                           <p className={`text-xs mt-1 ${
                             msg.sender_id === user?.id ? "text-primary-foreground/70" : "text-muted-foreground"
                           }`}>

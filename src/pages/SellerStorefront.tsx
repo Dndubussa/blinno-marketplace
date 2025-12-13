@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContactSellerDialog } from "@/components/messaging/ContactSellerDialog";
 import { Star, Package, Calendar, Store, MessageCircle } from "lucide-react";
+import { sanitizeText } from "@/lib/sanitize";
 
 export default function SellerStorefront() {
   const { sellerId } = useParams<{ sellerId: string }>();
@@ -166,7 +167,7 @@ export default function SellerStorefront() {
 
                 {seller.bio && (
                   <p className="mt-2 max-w-2xl text-muted-foreground">
-                    {seller.bio}
+                    {sanitizeText(seller.bio)}
                   </p>
                 )}
 
