@@ -420,7 +420,7 @@ export default function Products() {
                 {!["Music", "Books", "Courses"].includes(formData.category) && (
                   <>
                     <div className="space-y-2">
-                      <Label htmlFor="title">Product Title</Label>
+                      <Label htmlFor="title">Product Title *</Label>
                       <Input
                         id="title"
                         value={formData.title}
@@ -443,8 +443,20 @@ export default function Products() {
                         placeholder="Describe your product..."
                         rows={3}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        For digital products (Music, Books, Courses), title and description are auto-generated from category-specific fields.
+                      </p>
                     </div>
                   </>
+                )}
+                
+                {/* Info for digital products */}
+                {["Music", "Books", "Courses"].includes(formData.category) && (
+                  <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> For {formData.category} products, the title and description will be automatically generated from the category-specific fields below. Stock quantity is not required for digital products.
+                    </p>
+                  </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
