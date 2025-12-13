@@ -35,6 +35,7 @@ interface PaymentRequest {
   reference: string;
   description: string;
   order_id?: string;
+  subscription_id?: string;
 }
 
 let cachedToken: string = "";
@@ -341,6 +342,7 @@ serve(async (req) => {
               .insert({
                 user_id: user.id,
                 order_id: normalizedPayload.order_id || null,
+                subscription_id: normalizedPayload.subscription_id || null,
                 amount: normalizedPayload.amount,
                 currency: normalizedPayload.currency,
                 network: normalizedPayload.network,

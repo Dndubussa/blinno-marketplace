@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Check, Zap, TrendingUp, Crown, Loader2, AlertCircle, CreditCard } from "lucide-react";
+import { SubscriptionPaymentDialog } from "./SubscriptionPaymentDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -154,6 +155,8 @@ export function SubscriptionManagement() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [pendingUpgrade, setPendingUpgrade] = useState<{ planId: string; planName: string; amount: number; planPrice: number } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -230,29 +233,17 @@ export function SubscriptionManagement() {
           // Calculate prorated amount or full month
           const upgradeAmount = newPlan.price - (currentPlan.price || 0);
           
-          toast({
-            title: "Payment Required",
-            description: `Upgrading to ${newPlan.name} requires payment of ${upgradeAmount.toLocaleString()} TZS. Processing payment...`,
+          // Show payment dialog
+          setPendingUpgrade({
+            planId: newPlanId,
+            planName: newPlan.name,
+            amount: upgradeAmount,
+            planPrice: newPlan.price,
           });
-
-          // TODO: Integrate with payment system (ClickPesa/Flutterwave)
-          // For now, we'll update the plan status to pending
-          // In production, initiate payment and update after confirmation
-          const { error: updateError } = await supabase
-            .from("seller_subscriptions")
-            .update({
-              plan: `subscription_${newPlanId}`,
-              price_monthly: newPlan.price,
-              status: "pending", // Set to pending until payment is confirmed
-            })
-            .eq("id", subscription.id);
-
-          if (updateError) throw updateError;
-
-          toast({
-            title: "Plan Update Initiated",
-            description: `Your plan upgrade to ${newPlan.name} is pending payment confirmation. You'll receive an email with payment instructions.`,
-          });
+          setShowUpgradeDialog(false);
+          setShowPaymentDialog(true);
+          setUpgrading(false);
+          return;
         } else if (!isUpgrade && isSameModel) {
           // Downgrade within subscription model - takes effect at next billing cycle
           const { error: updateError } = await supabase
@@ -272,26 +263,17 @@ export function SubscriptionManagement() {
           });
         } else {
           // Switching from percentage to subscription - requires payment
-          toast({
-            title: "Payment Required",
-            description: `Switching to ${newPlan.name} requires payment of ${newPlan.priceLabel}/month. Processing payment...`,
+          // Show payment dialog
+          setPendingUpgrade({
+            planId: newPlanId,
+            planName: newPlan.name,
+            amount: newPlan.price,
+            planPrice: newPlan.price,
           });
-
-          const { error: updateError } = await supabase
-            .from("seller_subscriptions")
-            .update({
-              plan: `subscription_${newPlanId}`,
-              price_monthly: newPlan.price,
-              status: "pending",
-            })
-            .eq("id", subscription.id);
-
-          if (updateError) throw updateError;
-
-          toast({
-            title: "Plan Update Initiated",
-            description: `Your plan switch to ${newPlan.name} is pending payment confirmation.`,
-          });
+          setShowUpgradeDialog(false);
+          setShowPaymentDialog(true);
+          setUpgrading(false);
+          return;
         }
       } else {
         // Percentage plans - can switch immediately
@@ -644,6 +626,28 @@ export function SubscriptionManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Payment Dialog */}
+      {pendingUpgrade && (
+        <SubscriptionPaymentDialog
+          open={showPaymentDialog}
+          onOpenChange={setShowPaymentDialog}
+          amount={pendingUpgrade.amount}
+          planName={pendingUpgrade.planName}
+          subscriptionId={subscription.id}
+          newPlanId={pendingUpgrade.planId}
+          newPlanPrice={pendingUpgrade.planPrice}
+          onPaymentSuccess={async () => {
+            // Refresh subscription data
+            await fetchSubscription();
+            setPendingUpgrade(null);
+            toast({
+              title: "Payment Processing",
+              description: "Your subscription will be activated once payment is confirmed. This usually takes a few seconds.",
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

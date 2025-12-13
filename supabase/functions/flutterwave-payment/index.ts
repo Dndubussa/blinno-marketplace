@@ -42,6 +42,7 @@ interface PaymentRequest {
   reference: string;
   description: string;
   order_id?: string;
+  subscription_id?: string;
   email?: string;
   name?: string;
 }
@@ -452,6 +453,7 @@ serve(async (req) => {
             const { error: txError } = await supabase.from("payment_transactions").insert({
               user_id: user.id,
               order_id: normalizedPayload.order_id || null,
+              subscription_id: normalizedPayload.subscription_id || null,
               amount: normalizedPayload.amount,
               currency: normalizedPayload.currency,
               network: normalizedPayload.network,
@@ -596,6 +598,7 @@ serve(async (req) => {
           try {
             const { error: txError } = await supabase.from("payment_transactions").insert({
               user_id: user.id,
+              subscription_id: payload.meta?.subscription_id || null,
               amount: amount,
               currency: payload.currency || "TZS",
               reference: result.reference,

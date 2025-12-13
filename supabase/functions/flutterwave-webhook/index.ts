@@ -179,7 +179,7 @@ serve(async (req) => {
     // Find existing transaction
     const { data: existingTx, error: txFetchError } = await supabase
       .from("payment_transactions")
-      .select("id, amount, status, order_id, user_id")
+      .select("id, amount, status, order_id, user_id, subscription_id")
       .eq("reference", reference)
       .single();
 
@@ -269,6 +269,24 @@ serve(async (req) => {
         console.error("Error triggering receipt email:", emailError);
       }
 
+      // Handle subscription payment
+      if (existingTx.subscription_id) {
+        const { error: subError } = await supabase
+          .from("seller_subscriptions")
+          .update({
+            status: "active",
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+            payment_reference: payload.data.flw_ref || String(payload.data.id),
+          })
+          .eq("id", existingTx.subscription_id);
+
+        if (subError) {
+          console.error("Error updating subscription:", subError);
+        } else {
+          console.log(`Subscription ${existingTx.subscription_id} activated after successful payment`);
+        }
+      }
+
       // Update order if linked and create seller earnings
       if (existingTx.order_id) {
         const { error: orderError } = await supabase
@@ -331,17 +349,32 @@ serve(async (req) => {
       }
     }
 
-    // If payment failed, update order
-    if (newStatus === "failed" && existingTx.order_id) {
-      const { error: orderError } = await supabase
-        .from("orders")
-        .update({ status: "payment_failed" })
-        .eq("id", existingTx.order_id);
+    // If payment failed, update order or subscription
+    if (newStatus === "failed") {
+      if (existingTx.order_id) {
+        const { error: orderError } = await supabase
+          .from("orders")
+          .update({ status: "payment_failed" })
+          .eq("id", existingTx.order_id);
 
-      if (orderError) {
-        console.error("Error updating order to failed:", orderError);
-      } else {
-        console.log(`Order ${existingTx.order_id} marked as payment_failed`);
+        if (orderError) {
+          console.error("Error updating order to failed:", orderError);
+        } else {
+          console.log(`Order ${existingTx.order_id} marked as payment_failed`);
+        }
+      }
+
+      if (existingTx.subscription_id) {
+        const { error: subError } = await supabase
+          .from("seller_subscriptions")
+          .update({ status: "active" }) // Keep current plan if payment fails
+          .eq("id", existingTx.subscription_id);
+
+        if (subError) {
+          console.error("Error updating subscription after failed payment:", subError);
+        } else {
+          console.log(`Subscription ${existingTx.subscription_id} kept at current plan after failed payment`);
+        }
       }
     }
 
