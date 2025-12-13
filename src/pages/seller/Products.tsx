@@ -606,94 +606,95 @@ export default function Products() {
                 const isDigital = ["Music", "Books", "Courses"].includes(product.category);
                 const hasStock = product.stock_quantity !== null;
                 return (
-                <TableRow key={product.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <span>{product.title}</span>
-                      {product.description && (
-                        <span className="text-xs text-muted-foreground line-clamp-1">
-                          {product.description}
-                        </span>
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span>{product.title}</span>
+                        {product.description && (
+                          <span className="text-xs text-muted-foreground line-clamp-1">
+                            {product.description}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{product.category}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {isDigital ? (
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                          Digital
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                          Physical
+                        </Badge>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{product.category}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {isDigital ? (
-                      <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
-                        Digital
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                        Physical
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {product.currency === "TZS" 
-                      ? `TZS ${(product.price * 2500).toLocaleString()}`
-                      : `$${product.price.toFixed(2)}`
-                    }
-                  </TableCell>
-                  <TableCell>
-                    {isDigital ? (
-                      <Badge variant="outline" className="text-muted-foreground">
-                        N/A
-                      </Badge>
-                    ) : hasStock ? (
-                      <Badge
-                        variant={product.stock_quantity! > 10 ? "default" : product.stock_quantity! > 0 ? "secondary" : "destructive"}
-                      >
-                        {product.stock_quantity} in stock
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">Out of Stock</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={product.is_active ? "default" : "secondary"}>
-                      {product.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(product)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => toggleActive(product)}>
-                          {product.is_active ? (
-                            <>
-                              <EyeOff className="mr-2 h-4 w-4" />
-                              Deactivate
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Activate
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDelete(product.id)}
+                    </TableCell>
+                    <TableCell>
+                      {product.currency === "TZS" 
+                        ? `TZS ${(product.price * 2500).toLocaleString()}`
+                        : `$${product.price.toFixed(2)}`
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {isDigital ? (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          N/A
+                        </Badge>
+                      ) : hasStock ? (
+                        <Badge
+                          variant={product.stock_quantity! > 10 ? "default" : product.stock_quantity! > 0 ? "secondary" : "destructive"}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                          {product.stock_quantity} in stock
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive">Out of Stock</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={product.is_active ? "default" : "secondary"}>
+                        {product.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(product)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toggleActive(product)}>
+                            {product.is_active ? (
+                              <>
+                                <EyeOff className="mr-2 h-4 w-4" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Activate
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDelete(product.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
