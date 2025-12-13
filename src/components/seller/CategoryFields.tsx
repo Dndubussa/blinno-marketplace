@@ -10,10 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, X, FileAudio, FileVideo, FileText, Loader2 } from "lucide-react";
+import { Upload, X, FileAudio, FileVideo, FileText, Loader2, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { normalizeImageUrl } from "@/lib/imageUtils";
 
 interface CategoryFieldsProps {
   category: string;
@@ -484,16 +485,41 @@ export default function CategoryFields({ category, attributes, onChange, userId 
         <div className="space-y-2">
           <Label>Book Cover Image</Label>
           {attributes.coverImage ? (
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-              <img 
-                src={attributes.coverImage} 
-                alt="Cover" 
-                className="h-16 w-12 object-cover rounded"
-              />
-              <span className="text-sm flex-1 truncate">Cover uploaded</span>
-              <Button type="button" size="icon" variant="ghost" onClick={() => removeFile("coverImage")}>
-                <X className="h-4 w-4" />
-              </Button>
+            <div className="relative border-2 border-border rounded-lg overflow-hidden bg-muted">
+              <div className="relative aspect-[2/3] w-full max-w-xs">
+                <img 
+                  src={normalizeImageUrl(attributes.coverImage)} 
+                  alt="Book cover" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Failed to load book cover image:", attributes.coverImage);
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden absolute inset-0 items-center justify-center bg-muted flex-col gap-2">
+                  <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Image failed to load</span>
+                </div>
+              </div>
+              <div className="absolute top-2 right-2">
+                <Button 
+                  type="button" 
+                  size="icon" 
+                  variant="destructive" 
+                  className="h-8 w-8 rounded-full shadow-lg"
+                  onClick={() => removeFile("coverImage")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="p-3 bg-background/80 backdrop-blur-sm border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Cover uploaded</span>
+                  <span className="text-xs text-muted-foreground">Click X to remove</span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
@@ -688,16 +714,41 @@ export default function CategoryFields({ category, attributes, onChange, userId 
         <div className="space-y-2">
           <Label>Album Cover Art *</Label>
           {attributes.albumCover ? (
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-              <img 
-                src={attributes.albumCover} 
-                alt="Album cover" 
-                className="h-20 w-20 object-cover rounded"
-              />
-              <span className="text-sm flex-1 truncate">Cover art uploaded</span>
-              <Button type="button" size="icon" variant="ghost" onClick={() => removeFile("albumCover")}>
-                <X className="h-4 w-4" />
-              </Button>
+            <div className="relative border-2 border-border rounded-lg overflow-hidden bg-muted">
+              <div className="relative aspect-square w-full max-w-xs">
+                <img 
+                  src={normalizeImageUrl(attributes.albumCover)} 
+                  alt="Album cover" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Failed to load album cover image:", attributes.albumCover);
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden absolute inset-0 items-center justify-center bg-muted flex-col gap-2">
+                  <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Image failed to load</span>
+                </div>
+              </div>
+              <div className="absolute top-2 right-2">
+                <Button 
+                  type="button" 
+                  size="icon" 
+                  variant="destructive" 
+                  className="h-8 w-8 rounded-full shadow-lg"
+                  onClick={() => removeFile("albumCover")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="p-3 bg-background/80 backdrop-blur-sm border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Cover art uploaded</span>
+                  <span className="text-xs text-muted-foreground">Click X to remove</span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
@@ -869,18 +920,43 @@ export default function CategoryFields({ category, attributes, onChange, userId 
         <div className="space-y-2">
           <Label>Course Thumbnail Image *</Label>
           {attributes.thumbnail ? (
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-              <img 
-                src={attributes.thumbnail} 
-                alt="Course thumbnail" 
-                className="h-20 w-36 object-cover rounded"
-              />
-              <span className="text-sm flex-1 truncate">Thumbnail uploaded</span>
-              <Button type="button" size="icon" variant="ghost" onClick={() => removeFile("thumbnail")}>
-                <X className="h-4 w-4" />
-              </Button>
+            <div className="relative border-2 border-border rounded-lg overflow-hidden bg-muted">
+              <div className="relative aspect-video w-full max-w-md">
+                <img 
+                  src={normalizeImageUrl(attributes.thumbnail)} 
+                  alt="Course thumbnail" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Failed to load course thumbnail:", attributes.thumbnail);
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden absolute inset-0 items-center justify-center bg-muted flex-col gap-2">
+                  <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Image failed to load</span>
+                </div>
+              </div>
+              <div className="absolute top-2 right-2">
+                <Button 
+                  type="button" 
+                  size="icon" 
+                  variant="destructive" 
+                  className="h-8 w-8 rounded-full shadow-lg"
+                  onClick={() => removeFile("thumbnail")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="p-3 bg-background/80 backdrop-blur-sm border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Thumbnail uploaded</span>
+                  <span className="text-xs text-muted-foreground">Click X to remove</span>
+                </div>
+              </div>
             </div>
-            ) : (
+          ) : (
               <div className="space-y-2">
                 <Input
                   type="file"
