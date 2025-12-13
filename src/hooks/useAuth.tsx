@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const versionCheckDone = useRef(false); // Track if version check has been performed
 
   const fetchProfile = async (userId: string): Promise<void> => {
     // Skip if we already have profile for this user (prevent unnecessary refetches)
@@ -187,9 +188,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Only check version once per session - use ref to prevent multiple checks
+    if (versionCheckDone.current) {
+      return; // Version check already done, skip
+    }
+    
     // Check app version FIRST - sign out if version changed (app was redeployed)
     // Note: checkAppVersion() now updates the version internally if it changed
     const versionChanged = checkAppVersion();
+    versionCheckDone.current = true; // Mark as done immediately to prevent re-checking
+    
     if (versionChanged) {
       console.log("App version changed - signing out all users");
       
