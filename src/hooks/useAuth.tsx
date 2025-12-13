@@ -186,53 +186,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Only check version once per session - use ref to prevent multiple checks
-    if (versionCheckDone.current) {
-      return; // Version check already done, skip
-    }
-    
-    // Check app version FIRST - sign out if version changed (app was redeployed)
-    // Note: checkAppVersion() now updates the version internally if it changed
-    const versionChanged = checkAppVersion();
-    versionCheckDone.current = true; // Mark as done immediately to prevent re-checking
-    
-    if (versionChanged) {
-      console.log("App version changed - signing out all users");
-      
-      // Sign out from Supabase first
-      supabase.auth.signOut().catch(console.error);
-      
-      // Clear auth-related localStorage items (but keep app version)
-      localStorage.removeItem("blinno-cart");
-      localStorage.removeItem("blinno-wishlist");
-      localStorage.removeItem("blinno-saved-searches");
-      localStorage.removeItem("blinno_new_user_signup");
-      localStorage.removeItem("blinno_intended_role");
-      localStorage.removeItem("blinno_onboarding_tour_completed");
-      localStorage.removeItem("blinno_seller_onboarding_tour_completed");
-      // Note: checkAppVersion() already updated the version, so we don't need to call updateAppVersion() again
-      
-      // Show notification
-      toast({
-        title: "Platform Updated",
-        description: "The platform has been updated. Please sign in again to continue.",
-        variant: "default",
-      });
-      
-      // Reset all state
-      setProfile(null);
-      setRoles([]);
-      setUser(null);
-      setSession(null);
-      setLoading(false);
-      
-      return; // Exit early - don't set up auth listener
-    }
-
-    // Update app version if it matches (normal load - ensures version is stored)
-    // Only update if version hasn't changed (to avoid overwriting the update from checkAppVersion)
-    updateAppVersion();
-
     let isInitialLoad = true;
     let lastUserId: string | null = null;
     let hasProfileForUser = false;
@@ -450,8 +403,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
-    // Clear app version on sign out (will be set again on next load)
-    clearAppVersion();
   };
 
   const hasRole = (role: AppRole) => {
