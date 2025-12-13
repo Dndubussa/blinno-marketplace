@@ -6,12 +6,18 @@
 /**
  * Normalizes image URLs from Supabase storage
  * Handles both product-images and product-files buckets
+ * Note: Images in product-files bucket may not be accessible if bucket is private
  */
 export function normalizeImageUrl(url: string | null | undefined): string {
   if (!url) return "/placeholder.svg";
   
   // If already a full URL, return as is
   if (url.startsWith("http://") || url.startsWith("https://")) {
+    // Check if it's from product-files bucket (private) - these may not load
+    // This is a legacy issue - new uploads should go to product-images
+    if (url.includes('/product-files/')) {
+      console.warn('Image URL points to private product-files bucket. This image may not load. Please re-upload.');
+    }
     return url;
   }
   

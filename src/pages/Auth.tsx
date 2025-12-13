@@ -142,6 +142,9 @@ export default function Auth() {
           full_name: data.fullName,
           intended_role: data.role || "buyer", // Store intended role in metadata
         },
+        // Note: If email confirmation fails, check Supabase dashboard:
+        // - Authentication > Email Templates configuration
+        // - Project Settings > SMTP configuration (if using custom SMTP)
       },
     });
 
@@ -156,6 +159,14 @@ export default function Auth() {
           description: accountExistenceError.userMessage,
           variant: "destructive",
         });
+      } else if (error.message.includes('email') || error.message.includes('confirmation') || error.message.includes('535') || error.message.includes('500')) {
+        // Email confirmation/SMTP error
+        toast({
+          title: "Email Configuration Error",
+          description: "Unable to send confirmation email. This may be a temporary issue. Please try again later or contact support if the problem persists.",
+          variant: "destructive",
+        });
+        console.error("Email confirmation error:", error);
       } else {
         // Handle other errors
         toast({

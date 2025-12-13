@@ -196,11 +196,15 @@ export default function CategoryFields({ category, attributes, onChange, userId 
     const validExt = fileExt && fileExt.length > 0 ? fileExt : 'bin';
     const fileName = `${userId}/${Date.now()}.${validExt}`;
 
+    // Determine bucket: cover images go to product-images (public), other files go to product-files (private)
+    const isCoverImage = fieldName === 'albumCover' || fieldName === 'coverImage' || fieldName === 'thumbnail';
+    const bucket = isCoverImage ? 'product-images' : 'product-files';
+
     try {
       const { uploadFileWithProgress, getPublicUrl } = await import("@/lib/uploadUtils");
       
       const { data, error } = await uploadFileWithProgress({
-        bucket: 'product-files',
+        bucket: bucket,
         path: fileName,
         file: file,
         cacheControl: '3600',
@@ -217,7 +221,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
           variant: "destructive",
         });
       } else if (data) {
-        const publicUrl = getPublicUrl('product-files', fileName);
+        const publicUrl = getPublicUrl(bucket, fileName);
         updateAttribute(fieldName, publicUrl);
         toast({
           title: "File uploaded",
