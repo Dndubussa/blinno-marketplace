@@ -164,53 +164,49 @@ export default function Products() {
         productImagesData = [];
       }
     } else if (formData.category === "Books") {
-      // Generate title from book attributes
+      // Generate title from book title field
       const bookTitle = attributes.bookTitle || "";
-      const author = attributes.author || "";
-      productTitle = bookTitle || formData.title || "Untitled Book";
+      productTitle = bookTitle || "Untitled Book";
       
       // Generate description from book attributes
+      const author = attributes.author || "";
       const isbn = attributes.isbn || "";
       const publisher = attributes.publisher || "";
-      const publicationDate = attributes.publicationDate || "";
       const format = attributes.format || "";
+      const pages = attributes.pages || "";
       const parts = [];
       if (author) parts.push(`Author: ${author}`);
       if (isbn) parts.push(`ISBN: ${isbn}`);
       if (publisher) parts.push(`Publisher: ${publisher}`);
-      if (publicationDate) parts.push(`Published: ${new Date(publicationDate).toLocaleDateString()}`);
       if (format) parts.push(`Format: ${format}`);
+      if (pages) parts.push(`Pages: ${pages}`);
       productDescription = parts.length > 0 ? parts.join(" | ") : null;
       
       // Use book cover as the product image if available
-      if (attributes.bookCover) {
-        productImagesData = [attributes.bookCover];
+      if (attributes.coverImage) {
+        productImagesData = [attributes.coverImage];
       } else {
         productImagesData = [];
       }
     } else if (formData.category === "Courses") {
-      // Generate title from course attributes
+      // Generate title from course title field
       const courseTitle = attributes.courseTitle || "";
-      const instructor = attributes.instructor || "";
-      productTitle = courseTitle || formData.title || "Untitled Course";
+      productTitle = courseTitle || "Untitled Course";
       
       // Generate description from course attributes
-      const level = attributes.level || "";
-      const duration = attributes.duration || "";
-      const language = attributes.language || "";
+      const instructor = attributes.instructor || "";
+      const skillLevel = attributes.skillLevel || "";
+      const courseDuration = attributes.courseDuration || "";
+      const lessonsCount = attributes.lessonsCount || "";
       const parts = [];
       if (instructor) parts.push(`Instructor: ${instructor}`);
-      if (level) parts.push(`Level: ${level}`);
-      if (duration) parts.push(`Duration: ${duration}`);
-      if (language) parts.push(`Language: ${language}`);
+      if (skillLevel) parts.push(`Level: ${skillLevel}`);
+      if (courseDuration) parts.push(`Duration: ${courseDuration} hours`);
+      if (lessonsCount) parts.push(`Lessons: ${lessonsCount}`);
       productDescription = parts.length > 0 ? parts.join(" | ") : null;
       
-      // Use course thumbnail as the product image if available
-      if (attributes.thumbnail) {
-        productImagesData = [attributes.thumbnail];
-      } else {
-        productImagesData = [];
-      }
+      // Courses don't have a thumbnail field, so keep generic images or use preview video thumbnail
+      // For now, keep productImagesData as is
     }
 
     const productData = {

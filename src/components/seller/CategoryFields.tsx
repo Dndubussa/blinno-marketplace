@@ -269,6 +269,16 @@ export default function CategoryFields({ category, attributes, onChange, userId 
       <div className="space-y-4 border-t pt-4">
         <h4 className="font-medium text-sm text-muted-foreground">Book Details</h4>
         
+        <div className="space-y-2">
+          <Label>Book Title *</Label>
+          <Input
+            value={attributes.bookTitle || ""}
+            onChange={(e) => updateAttribute("bookTitle", e.target.value)}
+            placeholder="Enter book title"
+            required
+          />
+        </div>
+        
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Author</Label>
