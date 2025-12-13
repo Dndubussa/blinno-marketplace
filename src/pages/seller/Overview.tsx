@@ -28,49 +28,30 @@ interface Stats {
   averageOrderValue: number;
 }
 
-// Mock data for the chart (will be replaced with real data)
-const revenueData = [
-  { name: "Jan", revenue: 400 },
-  { name: "Feb", revenue: 300 },
-  { name: "Mar", revenue: 600 },
-  { name: "Apr", revenue: 800 },
-  { name: "May", revenue: 700 },
-  { name: "Jun", revenue: 900 },
-  { name: "Jul", revenue: 1100 },
-];
-
 const statCards = [
   {
     title: "Total Products",
     icon: Package,
     key: "totalProducts" as keyof Stats,
     format: (val: number) => val.toString(),
-    trend: "+12%",
-    trendUp: true,
   },
   {
     title: "Total Orders",
     icon: ShoppingCart,
     key: "totalOrders" as keyof Stats,
     format: (val: number) => val.toString(),
-    trend: "+8%",
-    trendUp: true,
   },
   {
     title: "Total Revenue",
     icon: DollarSign,
     key: "totalRevenue" as keyof Stats,
     format: (val: number) => `$${val.toFixed(2)}`,
-    trend: "+23%",
-    trendUp: true,
   },
   {
     title: "Avg. Order Value",
     icon: TrendingUp,
     key: "averageOrderValue" as keyof Stats,
     format: (val: number) => `$${val.toFixed(2)}`,
-    trend: "-2%",
-    trendUp: false,
   },
 ];
 
@@ -82,32 +63,84 @@ export default function Overview() {
     totalRevenue: 0,
     averageOrderValue: 0,
   });
+  const [revenueData, setRevenueData] = useState<Array<{ name: string; revenue: number }>>([]);
+  const [previousStats, setPreviousStats] = useState<Stats>({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
 
     const fetchStats = async () => {
+      setLoading(true);
+      
+      // Calculate date ranges
+      const now = new Date();
+      const sevenMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 7, 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
       // Fetch products count
       const { count: productsCount } = await supabase
         .from("products")
         .select("*", { count: "exact", head: true })
         .eq("seller_id", user.id);
 
-      // Fetch order items for this seller
+      // Fetch order items with order dates
       const { data: orderItems } = await supabase
         .from("order_items")
-        .select("price_at_purchase, quantity")
-        .eq("seller_id", user.id);
+        .select(`
+          price_at_purchase,
+          quantity,
+          orders!inner(created_at)
+        `)
+        .eq("seller_id", user.id)
+        .gte("orders.created_at", sevenMonthsAgo.toISOString());
+
+      if (!orderItems) {
+        setLoading(false);
+        return;
+      }
 
       const totalRevenue =
-        orderItems?.reduce(
+        orderItems.reduce(
           (sum, item) => sum + item.price_at_purchase * item.quantity,
           0
         ) || 0;
 
-      const totalOrders = orderItems?.length || 0;
+      const totalOrders = orderItems.length || 0;
       const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+      // Calculate previous month stats for trends
+      const previousMonthItems = orderItems.filter(item => {
+        const orderDate = new Date(item.orders?.created_at || new Date());
+        return orderDate >= lastMonthStart && orderDate <= lastMonthEnd;
+      });
+
+      const previousMonthRevenue = previousMonthItems.reduce(
+        (sum, item) => sum + item.price_at_purchase * item.quantity,
+        0
+      );
+      const previousMonthOrders = previousMonthItems.length;
+      const previousMonthAvgOrder = previousMonthOrders > 0 ? previousMonthRevenue / previousMonthOrders : 0;
+
+      // Get previous month products count
+      const { count: previousProductsCount } = await supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("seller_id", user.id)
+        .lte("created_at", lastMonthEnd.toISOString());
+
+      setPreviousStats({
+        totalProducts: previousProductsCount || 0,
+        totalOrders: previousMonthOrders,
+        totalRevenue: previousMonthRevenue,
+        averageOrderValue: previousMonthAvgOrder,
+      });
 
       setStats({
         totalProducts: productsCount || 0,
@@ -115,6 +148,30 @@ export default function Overview() {
         totalRevenue,
         averageOrderValue,
       });
+
+      // Generate monthly revenue data
+      const monthlyRevenue: Record<string, number> = {};
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${monthNames[date.getMonth()]}`;
+        monthlyRevenue[monthKey] = 0;
+      }
+
+      orderItems.forEach(item => {
+        const orderDate = new Date(item.orders?.created_at || new Date());
+        const monthKey = monthNames[orderDate.getMonth()];
+        if (monthlyRevenue[monthKey] !== undefined) {
+          monthlyRevenue[monthKey] += item.price_at_purchase * item.quantity;
+        }
+      });
+
+      setRevenueData(Object.entries(monthlyRevenue).map(([name, revenue]) => ({
+        name,
+        revenue: Math.round(revenue * 100) / 100,
+      })));
+
       setLoading(false);
     };
 
@@ -154,17 +211,37 @@ export default function Overview() {
                     stat.format(stats[stat.key])
                   )}
                 </div>
-                <div className="flex items-center text-xs mt-1">
-                  {stat.trendUp ? (
-                    <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                  )}
-                  <span className={stat.trendUp ? "text-green-500" : "text-red-500"}>
-                    {stat.trend}
-                  </span>
-                  <span className="text-muted-foreground ml-1">from last month</span>
-                </div>
+                {loading ? (
+                  <div className="h-4 w-32 mt-1 animate-pulse bg-muted rounded" />
+                ) : (() => {
+                  const currentValue = stats[stat.key];
+                  const previousValue = previousStats[stat.key];
+                  let trend = "0%";
+                  let trendUp = true;
+                  
+                  if (previousValue > 0) {
+                    const change = ((currentValue - previousValue) / previousValue) * 100;
+                    trend = `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+                    trendUp = change >= 0;
+                  } else if (currentValue > 0) {
+                    trend = "+100%";
+                    trendUp = true;
+                  }
+                  
+                  return (
+                    <div className="flex items-center text-xs mt-1">
+                      {trendUp ? (
+                        <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+                      ) : (
+                        <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+                      )}
+                      <span className={trendUp ? "text-green-500" : "text-red-500"}>
+                        {trend}
+                      </span>
+                      <span className="text-muted-foreground ml-1">from last month</span>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </motion.div>
@@ -183,8 +260,17 @@ export default function Overview() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
+              {loading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-muted-foreground">Loading chart data...</div>
+                </div>
+              ) : revenueData.length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-muted-foreground">No revenue data available</div>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={revenueData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(168 76% 42%)" stopOpacity={0.3} />
@@ -211,6 +297,7 @@ export default function Overview() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
