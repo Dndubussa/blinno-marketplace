@@ -168,6 +168,7 @@ async function initiateCheckout(payload: {
   const paymentsUrl = `${baseUrl}/payments`;
   
   console.log("Flutterwave API URL:", paymentsUrl);
+  console.log("Flutterwave base URL:", FLUTTERWAVE_BASE_URL);
 
   const response = await fetch(paymentsUrl, {
     method: "POST",
