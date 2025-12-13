@@ -87,8 +87,28 @@ export default function BuyerOrders() {
                         {format(new Date(order.created_at), "MMM d, yyyy 'at' h:mm a")}
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {order.order_items?.length || 0} item(s)
+                        {order.order_items?.length || 0} item{order.order_items?.length !== 1 ? 's' : ''}
                       </p>
+                      {order.order_items && order.order_items.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {order.order_items.slice(0, 3).map((item: any, idx: number) => {
+                            const isDigital = ["Music", "Books", "Courses"].includes(item.products?.category);
+                            return (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {item.products?.category || "Unknown"}
+                                {isDigital && (
+                                  <span className="ml-1 text-purple-600 dark:text-purple-400">• Digital</span>
+                                )}
+                              </Badge>
+                            );
+                          })}
+                          {order.order_items.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{order.order_items.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -119,6 +139,9 @@ export default function BuyerOrders() {
                             src={item.products.images[0]}
                             alt={item.products.title}
                             className="w-full h-full object-cover"
+                            width={64}
+                            height={64}
+                            loading="lazy"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
