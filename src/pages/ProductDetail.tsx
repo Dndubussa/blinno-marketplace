@@ -10,6 +10,7 @@ import { RelatedProducts } from "@/components/product-detail/RelatedProducts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Package } from "lucide-react";
+import { getAllProductImages } from "@/lib/imageUtils";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -107,12 +108,7 @@ export default function ProductDetail() {
           {/* Product Section */}
           <div className="grid gap-8 lg:grid-cols-2">
             <ImageGallery 
-              images={
-                // For Music category, include album cover art if available
-                product.category === "Music" && product.attributes?.albumCover
-                  ? [product.attributes.albumCover, ...(product.images || [])]
-                  : (product.images || [])
-              } 
+              images={getAllProductImages(product)}
               title={product.title} 
             />
             <ProductInfo product={product} />

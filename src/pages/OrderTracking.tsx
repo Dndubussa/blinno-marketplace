@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Json } from "@/integrations/supabase/types";
 import { useCurrency } from "@/hooks/useCurrency";
+import { getProductImage } from "@/lib/imageUtils";
 
 interface ShippingAddress {
   fullName: string;
@@ -293,17 +294,23 @@ export default function OrderTracking() {
                     {orderItems?.map((item) => (
                       <div key={item.id} className="flex gap-4">
                         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-muted">
-                          {item.products?.images?.[0] ? (
-                            <img
-                              src={item.products.images[0]}
-                              alt={item.products.title}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center">
-                              <Package className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                          )}
+                          {(() => {
+                            const imageUrl = item.products ? getProductImage(item.products) : "/placeholder.svg";
+                            return imageUrl !== "/placeholder.svg" ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.products?.title || "Product"}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = "/placeholder.svg";
+                                }}
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center">
+                                <Package className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex-1">
                           <Link

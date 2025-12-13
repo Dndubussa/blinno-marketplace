@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import { Package, Eye } from "lucide-react";
 import { format } from "date-fns";
+import { getProductImage } from "@/lib/imageUtils";
 
 export default function BuyerOrders() {
   const { user } = useAuth();
@@ -134,20 +135,26 @@ export default function BuyerOrders() {
                         key={item.id}
                         className="w-16 h-16 rounded-lg bg-muted flex-shrink-0 overflow-hidden"
                       >
-                        {item.products?.images?.[0] ? (
-                          <img
-                            src={item.products.images[0]}
-                            alt={item.products.title}
-                            className="w-full h-full object-cover"
-                            width={64}
-                            height={64}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                            N/A
-                          </div>
-                        )}
+                        {(() => {
+                          const imageUrl = item.products ? getProductImage(item.products) : "/placeholder.svg";
+                          return imageUrl !== "/placeholder.svg" ? (
+                            <img
+                              src={imageUrl}
+                              alt={item.products?.title || "Product"}
+                              className="w-full h-full object-cover"
+                              width={64}
+                              height={64}
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder.svg";
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                              N/A
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                     {order.order_items.length > 4 && (

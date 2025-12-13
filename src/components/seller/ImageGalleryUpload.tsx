@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, Image as ImageIcon, Loader2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { uploadFileWithProgress, getPublicUrl } from "@/lib/uploadUtils";
 
 interface ImageGalleryUploadProps {
   images: string[];
@@ -20,6 +22,7 @@ export default function ImageGalleryUpload({
   maxImages = 6,
 }: ImageGalleryUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -40,11 +43,15 @@ export default function ImageGalleryUpload({
 
     const filesToUpload = Array.from(files).slice(0, remainingSlots);
     setUploading(true);
+    setUploadProgress({});
 
     try {
       const uploadedUrls: string[] = [];
 
-      for (const file of filesToUpload) {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        const fileKey = `${file.name}-${i}`;
+        
         // Validate file type
         if (!file.type.startsWith("image/")) {
           toast({
@@ -68,9 +75,14 @@ export default function ImageGalleryUpload({
         const fileExt = file.name.split(".").pop();
         const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from("product-images")
-          .upload(fileName, file);
+        const { data, error: uploadError } = await uploadFileWithProgress({
+          bucket: "product-images",
+          path: fileName,
+          file: file,
+          onProgress: (progress) => {
+            setUploadProgress(prev => ({ ...prev, [fileKey]: progress.progress }));
+          },
+        });
 
         if (uploadError) {
           console.error("Upload error:", uploadError);
@@ -82,12 +94,9 @@ export default function ImageGalleryUpload({
           continue;
         }
 
-        const { data: urlData } = supabase.storage
-          .from("product-images")
-          .getPublicUrl(fileName);
-
-        if (urlData?.publicUrl) {
-          uploadedUrls.push(urlData.publicUrl);
+        if (data) {
+          const publicUrl = getPublicUrl("product-images", fileName);
+          uploadedUrls.push(publicUrl);
         }
       }
 
@@ -107,6 +116,7 @@ export default function ImageGalleryUpload({
       });
     } finally {
       setUploading(false);
+      setUploadProgress({});
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -204,11 +214,22 @@ export default function ImageGalleryUpload({
         {images.length < maxImages && (
           <motion.div
             layout
-            className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors flex flex-col items-center justify-center cursor-pointer"
+            className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors flex flex-col items-center justify-center cursor-pointer relative"
             onClick={() => fileInputRef.current?.click()}
           >
             {uploading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <div className="flex flex-col items-center justify-center gap-2 p-4 w-full">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="text-xs text-muted-foreground">Uploading...</span>
+                {Object.keys(uploadProgress).length > 0 && (
+                  <div className="w-full px-2">
+                    <Progress 
+                      value={Object.values(uploadProgress).reduce((a, b) => a + b, 0) / Object.keys(uploadProgress).length} 
+                      className="h-1.5" 
+                    />
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <Upload className="h-6 w-6 text-muted-foreground mb-1" />

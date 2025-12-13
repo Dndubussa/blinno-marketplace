@@ -8,6 +8,7 @@ import { useCart } from "@/hooks/useCart";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { ViewMode } from "@/pages/Products";
 import { Currency } from "@/lib/currency";
+import { getAllProductImages, getPrimaryImage } from "@/lib/imageUtils";
 
 interface Product {
   id: string;
@@ -41,13 +42,14 @@ const getCategoryColor = (category: string) => {
 export function ProductCard({ product, viewMode }: ProductCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
-  const images = product.images && product.images.length > 0 ? product.images : ["/placeholder.svg"];
+  // Use image utilities to get all product images including category-specific covers
+  const images = getAllProductImages(product);
   // Digital products don't have stock quantity (null)
   const hasStock = product.stock_quantity !== null;
   const isOutOfStock = hasStock && product.stock_quantity === 0;
   const { addToCart } = useCart();
   const { formatPrice } = useCurrency();
-  const hasMultipleImages = images.length > 1;
+  const hasMultipleImages = images.length > 1 && images[0] !== "/placeholder.svg";
 
   const handleImageError = (index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
@@ -67,7 +69,7 @@ export function ProductCard({ product, viewMode }: ProductCardProps) {
       id: product.id,
       title: product.title,
       price: product.price,
-      image: product.images?.[0] || null,
+      image: getPrimaryImage(images),
       stock_quantity: product.stock_quantity,
       seller_id: product.seller_id,
     });

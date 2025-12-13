@@ -10,9 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, X, FileAudio, FileVideo, FileText } from "lucide-react";
+import { Upload, X, FileAudio, FileVideo, FileText, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 interface CategoryFieldsProps {
   category: string;
@@ -29,6 +30,7 @@ const materials = ["Cotton", "Polyester", "Silk", "Wool", "Linen", "Leather", "D
 export default function CategoryFields({ category, attributes, onChange, userId }: CategoryFieldsProps) {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   const updateAttribute = (key: string, value: any) => {
     onChange({ ...attributes, [key]: value });
@@ -180,8 +182,8 @@ export default function CategoryFields({ category, attributes, onChange, userId 
   };
 
   const performFileUpload = async (file: File, fieldName: string, inputElement?: HTMLInputElement) => {
-
     setUploading(true);
+    setUploadProgress({ [fieldName]: 0 });
     
     // Extract file extension, handling files without extensions
     const fileParts = file.name.split('.');
@@ -194,12 +196,18 @@ export default function CategoryFields({ category, attributes, onChange, userId 
     const fileName = `${userId}/${Date.now()}.${validExt}`;
 
     try {
-      const { data, error } = await supabase.storage
-        .from('product-files')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      const { uploadFileWithProgress, getPublicUrl } = await import("@/lib/uploadUtils");
+      
+      const { data, error } = await uploadFileWithProgress({
+        bucket: 'product-files',
+        path: fileName,
+        file: file,
+        cacheControl: '3600',
+        upsert: false,
+        onProgress: (progress) => {
+          setUploadProgress(prev => ({ ...prev, [fieldName]: progress.progress }));
+        },
+      });
 
       if (error) {
         toast({
@@ -207,12 +215,9 @@ export default function CategoryFields({ category, attributes, onChange, userId 
           description: error.message || "Failed to upload file. Please try again.",
           variant: "destructive",
         });
-      } else {
-        const { data: urlData } = supabase.storage
-          .from('product-files')
-          .getPublicUrl(fileName);
-        
-        updateAttribute(fieldName, urlData.publicUrl);
+      } else if (data) {
+        const publicUrl = getPublicUrl('product-files', fileName);
+        updateAttribute(fieldName, publicUrl);
         toast({
           title: "File uploaded",
           description: "Your file has been uploaded successfully.",
@@ -226,6 +231,11 @@ export default function CategoryFields({ category, attributes, onChange, userId 
       });
     } finally {
       setUploading(false);
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[fieldName];
+        return newProgress;
+      });
       // Reset input if element is provided
       if (inputElement) {
         inputElement.value = '';
@@ -486,12 +496,23 @@ export default function CategoryFields({ category, attributes, onChange, userId 
               </Button>
             </div>
           ) : (
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileUpload(e, "coverImage")}
-              disabled={uploading}
-            />
+            <div className="space-y-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e, "coverImage")}
+                disabled={uploading}
+              />
+              {uploading && uploadProgress["coverImage"] !== undefined && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Uploading...</span>
+                    <span className="text-muted-foreground">{uploadProgress["coverImage"]}%</span>
+                  </div>
+                  <Progress value={uploadProgress["coverImage"]} className="h-2" />
+                </div>
+              )}
+            </div>
           )}
           <p className="text-xs text-muted-foreground">Upload book cover (required: portrait 2:3 ratio, minimum 600x900px, recommended: 1200x1800px)</p>
         </div>
@@ -679,12 +700,23 @@ export default function CategoryFields({ category, attributes, onChange, userId 
               </Button>
             </div>
           ) : (
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileUpload(e, "albumCover")}
-              disabled={uploading}
-            />
+            <div className="space-y-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e, "albumCover")}
+                disabled={uploading}
+              />
+              {uploading && uploadProgress["albumCover"] !== undefined && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Uploading...</span>
+                    <span className="text-muted-foreground">{uploadProgress["albumCover"]}%</span>
+                  </div>
+                  <Progress value={uploadProgress["albumCover"]} className="h-2" />
+                </div>
+              )}
+            </div>
           )}
           <p className="text-xs text-muted-foreground">Upload high-quality album cover art (required: square 1:1 ratio, minimum 1000x1000px)</p>
         </div>
@@ -848,14 +880,25 @@ export default function CategoryFields({ category, attributes, onChange, userId 
                 <X className="h-4 w-4" />
               </Button>
             </div>
-          ) : (
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileUpload(e, "thumbnail")}
-              disabled={uploading}
-            />
-          )}
+            ) : (
+              <div className="space-y-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileUpload(e, "thumbnail")}
+                  disabled={uploading}
+                />
+                {uploading && uploadProgress["thumbnail"] !== undefined && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Uploading...</span>
+                      <span className="text-muted-foreground">{uploadProgress["thumbnail"]}%</span>
+                    </div>
+                    <Progress value={uploadProgress["thumbnail"]} className="h-2" />
+                  </div>
+                )}
+              </div>
+            )}
           <p className="text-xs text-muted-foreground">Upload course thumbnail (recommended: 1920x1080px, 16:9 ratio, landscape)</p>
         </div>
 
