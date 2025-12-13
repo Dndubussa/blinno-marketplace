@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Save, User, Store, Bell, Shield, DollarSign } from "lucide-react";
+import { Save, User, Store, Bell, Shield, DollarSign, CreditCard } from "lucide-react";
+import { SubscriptionManagement } from "@/components/seller/SubscriptionManagement";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -100,6 +101,10 @@ export default function Settings() {
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
             Notifications
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            Subscription
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
             <Shield className="h-4 w-4" />
@@ -298,6 +303,16 @@ export default function Settings() {
                 ))}
               </CardContent>
             </Card>
+          </motion.div>
+        </TabsContent>
+
+        {/* Subscription Tab */}
+        <TabsContent value="subscription">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <SubscriptionManagement />
           </motion.div>
         </TabsContent>
 

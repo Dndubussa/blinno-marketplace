@@ -1,12 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+
+// CORS configuration with origin validation
+const ALLOWED_ORIGINS = [
+  "https://www.blinno.app",
+  "https://blinno.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(origin?: string | null, methods: string = "POST, OPTIONS"): Record<string, string> {
+  let allowedOrigin = ALLOWED_ORIGINS[0];
+  if (origin && typeof origin === "string") {
+    const normalizedOrigin = origin.trim().toLowerCase();
+    const isAllowed = ALLOWED_ORIGINS.some((allowed) => allowed.toLowerCase() === normalizedOrigin);
+    if (isAllowed) allowedOrigin = origin;
+  }
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": methods,
+    "Access-Control-Max-Age": "86400",
+  };
+}
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const webhookSecret = Deno.env.get("CLICKPESA_WEBHOOK_SECRET");
 
@@ -53,6 +71,9 @@ async function verifySignature(payload: string, signature: string, secret: strin
 }
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin, "POST, OPTIONS");
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

@@ -133,9 +133,6 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const rawBody = await req.text();
     const payload: FlutterwaveWebhook = JSON.parse(rawBody);
-    
-    // Update corsHeaders for all responses
-    const corsHeaders = getCorsHeaders(origin);
 
     console.log("Flutterwave webhook received:", JSON.stringify(payload, null, 2));
 

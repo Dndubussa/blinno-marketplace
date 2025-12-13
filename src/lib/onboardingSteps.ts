@@ -73,8 +73,8 @@ export interface StepField {
 export const stepConfigs: Record<StepId, StepConfig> = {
   category: {
     id: "category",
-    title: "Select Your Seller Type",
-    description: "Choose the category that best describes you",
+    title: "Tell Us About Your Business",
+    description: "Select your business type to customize your onboarding. You can sell any product category later.",
     component: "CategorySelection",
     fields: [],
     order: 1,

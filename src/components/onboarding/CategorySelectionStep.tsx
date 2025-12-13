@@ -22,9 +22,12 @@ export function CategorySelectionStep({ selectedType, onSelect, onNext }: Catego
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">What type of seller are you?</h2>
+        <h2 className="text-2xl font-bold">Tell Us About Your Business</h2>
         <p className="text-muted-foreground">
-          Select the category that best describes you. This helps us customize your onboarding experience.
+          Select the type that best describes your business. This helps us customize your onboarding experience with relevant steps and information.
+        </p>
+        <p className="text-sm text-muted-foreground mt-2">
+          <strong>Note:</strong> You can sell products from any category later, regardless of your selection here.
         </p>
       </div>
 

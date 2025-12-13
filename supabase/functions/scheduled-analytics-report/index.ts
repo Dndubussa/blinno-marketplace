@@ -4,11 +4,28 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// CORS configuration with origin validation
+const ALLOWED_ORIGINS = [
+  "https://www.blinno.app",
+  "https://blinno.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(origin?: string | null, methods: string = "POST, OPTIONS"): Record<string, string> {
+  let allowedOrigin = ALLOWED_ORIGINS[0];
+  if (origin && typeof origin === "string") {
+    const normalizedOrigin = origin.trim().toLowerCase();
+    const isAllowed = ALLOWED_ORIGINS.some((allowed) => allowed.toLowerCase() === normalizedOrigin);
+    if (isAllowed) allowedOrigin = origin;
+  }
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": methods,
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
 interface ScheduleRequest {
   frequency: "weekly" | "monthly";
@@ -17,6 +34,9 @@ interface ScheduleRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin, "POST, OPTIONS");
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
