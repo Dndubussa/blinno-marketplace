@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Search } from "lucide-react";
+import { SearchAutocomplete } from "@/components/search/SearchAutocomplete";
 
 export function HeroSection() {
   const navigate = useNavigate();
@@ -51,6 +52,16 @@ export function HeroSection() {
           >
             From physical products to digital courses, from restaurant menus to live events, Blinno empowers everyone to turn their passion into profit.
           </motion.p>
+
+          {/* Search Bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="mt-8 mx-auto max-w-2xl"
+          >
+            <SearchAutocomplete />
+          </motion.div>
 
           {/* Buttons */}
           <motion.div

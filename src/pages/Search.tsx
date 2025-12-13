@@ -31,12 +31,14 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useSavedSearches, SavedSearch } from "@/hooks/useSavedSearches";
 import { toast } from "sonner";
@@ -261,6 +263,9 @@ export default function SearchPage() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Save Search</DialogTitle>
+                  <DialogDescription>
+                    Save this search to quickly access it later from your saved searches.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                   <Label htmlFor="search-name">Search Name</Label>

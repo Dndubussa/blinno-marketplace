@@ -24,6 +24,13 @@ import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormField,
@@ -36,6 +43,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import {
+  calculateShipping,
+  calculateTax,
+  getAllCountries,
+  getCountryConfig,
+} from "@/lib/shippingConfig";
 
 const shippingSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -106,8 +119,114 @@ export default function Checkout() {
     },
   });
 
-  const shippingCost = totalPrice >= 100 ? 0 : 9.99;
-  const tax = totalPrice * 0.08;
+  // Watch country field for real-time calculations
+  const selectedCountry = form.watch("country");
+  const availableCountries = getAllCountries();
+
+  // Helper function to check if a product category is digital
+  const isDigitalProduct = (category: string): boolean => {
+    return ["Music", "Books", "Courses"].includes(category);
+  };
+
+  // Calculate shipping and tax exemptions
+  // We need to fetch product categories to determine exemptions
+  const [productCategories, setProductCategories] = useState<Record<string, string>>({});
+  const [sellerCountries, setSellerCountries] = useState<Record<string, string | null>>({});
+
+  // Fetch product categories and seller locations when items change
+  useEffect(() => {
+    const fetchProductInfo = async () => {
+      if (items.length === 0) {
+        setProductCategories({});
+        setSellerCountries({});
+        return;
+      }
+
+      const productIds = items.map((item) => item.id);
+      const sellerIds = [...new Set(items.map((item) => item.seller_id))];
+
+      // Fetch product categories
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, category, seller_id")
+        .in("id", productIds);
+
+      if (products) {
+        const categoryMap: Record<string, string> = {};
+        products.forEach((p) => {
+          categoryMap[p.id] = p.category;
+        });
+        setProductCategories(categoryMap);
+      }
+
+      // Fetch seller countries from profiles
+      const { data: sellerProfiles } = await supabase
+        .from("profiles")
+        .select("id, country")
+        .in("id", sellerIds);
+
+      if (sellerProfiles) {
+        const sellerCountryMap: Record<string, string | null> = {};
+        sellerProfiles.forEach((profile) => {
+          sellerCountryMap[profile.id] = profile.country;
+        });
+        setSellerCountries(sellerCountryMap);
+      } else {
+        // Fallback: set all to null if fetch fails
+        const sellerCountryMap: Record<string, string | null> = {};
+        sellerIds.forEach((id) => {
+          sellerCountryMap[id] = null;
+        });
+        setSellerCountries(sellerCountryMap);
+      }
+    };
+
+    fetchProductInfo();
+  }, [items]);
+
+  // Calculate exemptions
+  const hasDigitalProducts = items.some((item) => {
+    const category = productCategories[item.id];
+    return category && isDigitalProduct(category);
+  });
+
+  const allProductsDigital = items.length > 0 && items.every((item) => {
+    const category = productCategories[item.id];
+    return category && isDigitalProduct(category);
+  });
+
+  // Calculate shipping and tax based on selected country
+  // Use selectedCountry from form watch, fallback to "Tanzania" if not set
+  const countryForCalculation = selectedCountry || "Tanzania";
+  
+  // Get seller countries for same-country exemption
+  // For mixed carts, use the first seller's country (or null if not set)
+  // In a real scenario, you might want to calculate per-item shipping
+  const sellerCountryForExemption = items.length > 0 
+    ? sellerCountries[items[0].seller_id] || null
+    : null;
+  
+  // Shipping cost: calculated based on country and order total
+  // Exempt for digital products or same-country matches
+  const shippingCost = calculateShipping(
+    countryForCalculation,
+    totalPrice,
+    allProductsDigital,
+    sellerCountryForExemption
+  );
+
+  // Tax: calculated based on country and order total
+  // Exempt for digital products
+  const tax = calculateTax(
+    countryForCalculation,
+    totalPrice,
+    allProductsDigital,
+    sellerCountryForExemption
+  );
+
+  // Get country config for display purposes
+  const countryConfig = getCountryConfig(countryForCalculation);
+
   const orderTotal = totalPrice + shippingCost + tax;
   const orderTotalTZS = orderTotal * 2500; // Convert to TZS
 
@@ -149,7 +268,7 @@ export default function Checkout() {
       const productIds = items.map((item) => item.id);
       const { data: products, error: productsError } = await supabase
         .from("products")
-        .select("id, price, stock_quantity, is_active, seller_id, title")
+        .select("id, price, stock_quantity, is_active, seller_id, title, category")
         .in("id", productIds);
 
       if (productsError) {
@@ -187,6 +306,7 @@ export default function Checkout() {
           ...cartItem,
           validatedPrice: product.price, // Use database price, not client price
           validatedSellerId: product.seller_id,
+          validatedCategory: product.category, // Include category for exemption calculation
         };
       });
 
@@ -195,8 +315,44 @@ export default function Checkout() {
         (sum, item) => sum + item.validatedPrice * item.quantity,
         0
       );
-      const validatedShippingCost = validatedTotalPrice >= 100 ? 0 : 9.99;
-      const validatedTax = validatedTotalPrice * 0.08;
+
+      // Check if all products are digital for exemptions
+      const validatedAllDigital = validatedItems.every((item) =>
+        isDigitalProduct(item.validatedCategory)
+      );
+
+      // Get selected country for calculations (use shippingData if available, otherwise form value)
+      const countryForValidation = shippingData?.country || selectedCountry || "Tanzania";
+
+      // Get seller countries for same-country exemption
+      const sellerIdsForValidation = [...new Set(validatedItems.map((item) => item.validatedSellerId))];
+      const { data: sellerProfilesForValidation } = await supabase
+        .from("profiles")
+        .select("id, country")
+        .in("id", sellerIdsForValidation);
+
+      const sellerCountryForValidation = sellerProfilesForValidation && sellerProfilesForValidation.length > 0
+        ? sellerProfilesForValidation[0].country // Use first seller's country for mixed carts
+        : null;
+
+      // Shipping cost: calculated based on country and order total
+      // Exempt for digital products or same-country matches
+      const validatedShippingCost = calculateShipping(
+        countryForValidation,
+        validatedTotalPrice,
+        validatedAllDigital,
+        sellerCountryForValidation
+      );
+
+      // Tax: calculated based on country and order total
+      // Exempt for digital products
+      const validatedTax = calculateTax(
+        countryForValidation,
+        validatedTotalPrice,
+        validatedAllDigital,
+        sellerCountryForValidation
+      );
+
       const validatedOrderTotal = validatedTotalPrice + validatedShippingCost + validatedTax;
       const validatedOrderTotalTZS = validatedOrderTotal * 2500;
 
@@ -556,10 +712,22 @@ export default function Checkout() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5 text-primary" />
-                      Shipping Information
+                      {allProductsDigital ? "Contact Information" : "Shipping Information"}
                     </CardTitle>
+                    {allProductsDigital && (
+                      <CardDescription>
+                        Digital products don't require physical shipping. We'll use this information for order confirmation and delivery.
+                      </CardDescription>
+                    )}
                   </CardHeader>
                   <CardContent>
+                    {allProductsDigital && (
+                      <div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          <strong>Note:</strong> All items in your cart are digital products. No shipping fees or taxes will be charged.
+                        </p>
+                      </div>
+                    )}
                     <Form {...form}>
                       <form
                         onSubmit={form.handleSubmit(onShippingSubmit)}
@@ -677,10 +845,40 @@ export default function Checkout() {
                             name="country"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Country</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Tanzania" {...field} />
-                                </FormControl>
+                                <FormLabel>Country / Region</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select your country" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="max-h-[300px]">
+                                    {availableCountries.map((country) => (
+                                      <SelectItem key={country.value} value={country.value}>
+                                        {country.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {countryConfig && !allProductsDigital && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Shipping: {countryConfig.shippingRate === 0 || totalPrice >= countryConfig.freeShippingThreshold
+                                      ? "Free"
+                                      : `$${countryConfig.shippingRate.toFixed(2)}`}
+                                    {totalPrice < countryConfig.freeShippingThreshold && (
+                                      <span className="ml-2">
+                                        (Free over ${countryConfig.freeShippingThreshold})
+                                      </span>
+                                    )}
+                                    {" • "}
+                                    Tax: {countryConfig.taxExempt
+                                      ? "Exempt"
+                                      : `${(countryConfig.taxRate * 100).toFixed(1)}%`}
+                                  </p>
+                                )}
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -890,15 +1088,42 @@ export default function Checkout() {
                       <span className="text-muted-foreground">Shipping</span>
                       <span>
                         {shippingCost === 0 ? (
-                          <span className="text-green-500">Free</span>
+                          <span className="text-green-500">
+                            {allProductsDigital
+                              ? "Exempt (Digital)"
+                              : sellerCountryForExemption &&
+                                sellerCountryForExemption.trim().toLowerCase() ===
+                                  countryForCalculation.trim().toLowerCase()
+                              ? "Free (Same Country)"
+                              : "Free"}
+                          </span>
                         ) : (
                           formatPrice(shippingCost)
                         )}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Tax (8%)</span>
-                      <span>{formatPrice(tax)}</span>
+                      <span className="text-muted-foreground">
+                        Tax
+                        {countryConfig && !countryConfig.taxExempt && !allProductsDigital && (
+                          <span className="text-muted-foreground/70">
+                            {" "}({(countryConfig.taxRate * 100).toFixed(1)}%)
+                          </span>
+                        )}
+                      </span>
+                      <span>
+                        {tax === 0 ? (
+                          <span className="text-green-500">
+                            {allProductsDigital
+                              ? "Exempt (Digital)"
+                              : countryConfig?.taxExempt
+                              ? "Exempt"
+                              : "N/A"}
+                          </span>
+                        ) : (
+                          formatPrice(tax)
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -916,9 +1141,25 @@ export default function Checkout() {
                     </div>
                   </div>
 
-                  {totalPrice < 100 && (
-                    <p className="text-xs text-muted-foreground text-center">
-                      Add {formatPrice(100 - totalPrice)} more for free shipping!
+                  {countryConfig &&
+                    totalPrice < countryConfig.freeShippingThreshold &&
+                    !allProductsDigital && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        Add {formatPrice(
+                          countryConfig.freeShippingThreshold - totalPrice
+                        )}{" "}
+                        more for free shipping to {selectedCountry}!
+                      </p>
+                    )}
+                  {allProductsDigital && (
+                    <p className="text-xs text-green-600 dark:text-green-400 text-center">
+                      ✓ Digital products are exempt from shipping and tax
+                    </p>
+                  )}
+                  {selectedCountry && countryConfig && !allProductsDigital && (
+                    <p className="text-xs text-muted-foreground text-center mt-1">
+                      Shipping to {selectedCountry}
+                      {countryConfig.region && ` (${countryConfig.region})`}
                     </p>
                   )}
                 </CardContent>

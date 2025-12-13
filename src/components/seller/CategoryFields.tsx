@@ -140,7 +140,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
         }
 
         // All validations passed, proceed with upload
-        performFileUpload(file, fieldName).catch((error) => {
+        performFileUpload(file, fieldName, e.target).catch((error) => {
           console.error("Upload error:", error);
           toast({
             title: "Upload failed",
@@ -176,10 +176,10 @@ export default function CategoryFields({ category, attributes, onChange, userId 
     }
 
     // Proceed with upload for non-image files
-    await performFileUpload(file, fieldName);
+    await performFileUpload(file, fieldName, e.target);
   };
 
-  const performFileUpload = async (file: File, fieldName: string) => {
+  const performFileUpload = async (file: File, fieldName: string, inputElement?: HTMLInputElement) => {
 
     setUploading(true);
     
@@ -226,8 +226,10 @@ export default function CategoryFields({ category, attributes, onChange, userId 
       });
     } finally {
       setUploading(false);
-      // Reset input
-      e.target.value = '';
+      // Reset input if element is provided
+      if (inputElement) {
+        inputElement.value = '';
+      }
     }
   };
 

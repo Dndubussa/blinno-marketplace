@@ -28,6 +28,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -395,6 +396,11 @@ export default function Products() {
               <DialogTitle>
                 {editingProduct ? "Edit Product" : "Add New Product"}
               </DialogTitle>
+              <DialogDescription>
+                {editingProduct 
+                  ? "Update your product information below." 
+                  : "Fill in the details to add a new product to your store."}
+              </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh] pr-4">
               <form onSubmit={handleSubmit} className="space-y-4">

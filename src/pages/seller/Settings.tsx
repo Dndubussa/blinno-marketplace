@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrency } from "@/hooks/useCurrency";
 import { SUPPORTED_CURRENCIES, CURRENCY_INFO, Currency } from "@/lib/currency";
+import { getAllCountries } from "@/lib/shippingConfig";
 import {
   Select,
   SelectContent,
@@ -33,6 +35,10 @@ export default function Settings() {
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || "",
     bio: profile?.bio || "",
+    country: profile?.country || "",
+    city: profile?.city || "",
+    state: profile?.state || "",
+    address: profile?.address || "",
   });
   const [notifications, setNotifications] = useState({
     orderAlerts: true,
@@ -51,6 +57,10 @@ export default function Settings() {
       .update({
         full_name: formData.full_name,
         bio: formData.bio,
+        country: formData.country || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        address: formData.address || null,
       })
       .eq("id", user.id);
 
@@ -165,6 +175,84 @@ export default function Settings() {
                       rows={4}
                     />
                   </div>
+
+                  <Separator className="my-4" />
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Location Information</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Your location helps us calculate accurate shipping costs and may qualify you for same-country exemptions.
+                    </p>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="country">Country</Label>
+                        <Select
+                          value={formData.country}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, country: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your country" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            {getAllCountries().map((country) => (
+                              <SelectItem key={country.value} value={country.value}>
+                                {country.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Your country helps determine shipping rates and tax exemptions for buyers.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="city">City</Label>
+                          <Input
+                            id="city"
+                            value={formData.city}
+                            onChange={(e) =>
+                              setFormData({ ...formData, city: e.target.value })
+                            }
+                            placeholder="Your city"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="state">State/Region</Label>
+                          <Input
+                            id="state"
+                            value={formData.state}
+                            onChange={(e) =>
+                              setFormData({ ...formData, state: e.target.value })
+                            }
+                            placeholder="Your state or region"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="address">Address (Optional)</Label>
+                        <Input
+                          id="address"
+                          value={formData.address}
+                          onChange={(e) =>
+                            setFormData({ ...formData, address: e.target.value })
+                          }
+                          placeholder="Street address (optional)"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Optional: Provide your address for more precise location-based calculations.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="my-4" />
 
                   <div className="space-y-2">
                     <Label htmlFor="currency">Preferred Currency</Label>

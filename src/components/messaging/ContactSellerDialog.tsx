@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -193,10 +194,10 @@ export function ContactSellerDialog({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sign in required</DialogTitle>
+            <DialogDescription>
+              Please sign in to contact this seller.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-muted-foreground">
-            Please sign in to contact this seller.
-          </p>
           <Button asChild>
             <a href="/sign-in">Sign In</a>
           </Button>
@@ -219,7 +220,7 @@ export function ContactSellerDialog({
             </Avatar>
             <div>
               <DialogTitle className="text-left">{sellerName}</DialogTitle>
-              <p className="text-sm text-muted-foreground">Seller</p>
+              <DialogDescription className="text-left">Seller</DialogDescription>
             </div>
           </div>
         </DialogHeader>

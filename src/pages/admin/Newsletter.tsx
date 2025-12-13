@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -287,6 +288,9 @@ export default function Newsletter() {
                   <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
                     <DialogHeader>
                       <DialogTitle>Email Preview</DialogTitle>
+                      <DialogDescription>
+                        Preview how your newsletter email will appear to subscribers.
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="border rounded-lg p-4 bg-white">
                       <p className="text-sm text-muted-foreground mb-2">
