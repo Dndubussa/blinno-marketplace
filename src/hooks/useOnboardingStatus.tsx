@@ -19,34 +19,32 @@ export function useOnboardingStatus() {
   const lastUserIdRef = useRef<string | null>(null);
   const isInitialLoadRef = useRef(true);
 
-  const loadStatus = useCallback(async () => {
-    if (!user) return;
-
+  const loadStatus = useCallback(async (userId: string) => {
     // Prevent refetching if we already have status for this user
     // Only refetch if user changed or on initial load
-    if (lastUserIdRef.current === user.id && !isInitialLoadRef.current) {
+    if (lastUserIdRef.current === userId && !isInitialLoadRef.current) {
       return;
     }
 
-    lastUserIdRef.current = user.id;
+    lastUserIdRef.current = userId;
     isInitialLoadRef.current = false;
 
     setLoading(true);
     try {
-      const onboardingStatus = await checkOnboardingStatus(user.id);
+      const onboardingStatus = await checkOnboardingStatus(userId);
       setStatus(onboardingStatus);
     } catch (error) {
       console.error("Error loading onboarding status:", error);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       // Only load if user changed or on initial load
       if (lastUserIdRef.current !== user.id || isInitialLoadRef.current) {
-        loadStatus();
+        loadStatus(user.id);
       }
     } else {
       setStatus(null);
@@ -61,7 +59,7 @@ export function useOnboardingStatus() {
 
     const success = await markStepCompleted(user.id, stepId, stepData);
     if (success) {
-      await loadStatus(); // Reload status
+      await loadStatus(user.id); // Reload status
     }
     return success;
   };
@@ -78,7 +76,7 @@ export function useOnboardingStatus() {
       onboardingData
     );
     if (success) {
-      await loadStatus(); // Reload status
+      await loadStatus(user.id); // Reload status
     }
     return success;
   };
@@ -88,10 +86,16 @@ export function useOnboardingStatus() {
     return getOnboardingStepsForUser(status);
   };
 
+  const refresh = useCallback(() => {
+    if (user?.id) {
+      loadStatus(user.id);
+    }
+  }, [user?.id, loadStatus]);
+
   return {
     status,
     loading,
-    refresh: loadStatus,
+    refresh,
     completeStep,
     completeOnboarding,
     getSteps,

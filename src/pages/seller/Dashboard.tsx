@@ -128,8 +128,16 @@ export default function SellerDashboard() {
   // This respects the persistent onboarding_completed flag
   // Use refs to prevent unnecessary re-runs on tab switch
   const hasCheckedOnboardingRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    // Only check once when conditions are met, not on every render
+    // Reset check flag if user changes
+    if (user?.id !== lastUserIdRef.current) {
+      hasCheckedOnboardingRef.current = false;
+      lastUserIdRef.current = user?.id || null;
+    }
+    
+    // Only check once when conditions are met, not on every render or tab switch
     if (!loading && !onboardingLoading && user && hasRole("seller") && !hasCheckedOnboardingRef.current) {
       // Only redirect if onboarding is truly incomplete
       // If onboarding_completed flag is true and version is current, never redirect
@@ -141,10 +149,6 @@ export default function SellerDashboard() {
         hasCheckedOnboardingRef.current = true;
       }
     }
-    
-    // Reset check flag if user changes
-    if (!user) {
-      hasCheckedOnboardingRef.current = false;
   }, [loading, onboardingLoading, user?.id, hasRole, shouldShowOnboarding, onboardingStatus?.isComplete, navigate]);
 
   if (loading || onboardingLoading) {
