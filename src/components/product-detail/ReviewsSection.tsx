@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Star, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { sanitizeText } from "@/lib/sanitize";
 
 interface ReviewsSectionProps {
   productId: string;
