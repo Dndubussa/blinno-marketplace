@@ -130,7 +130,7 @@ export default function Products() {
 
     if (!user) return;
 
-    // For Music category, generate title from music-specific fields
+    // Generate title and description from category-specific fields
     let productTitle = formData.title;
     let productDescription = formData.description || null;
     let productImagesData = productImages;
@@ -160,6 +160,54 @@ export default function Products() {
       // Use album cover as the product image if available
       if (attributes.albumCover) {
         productImagesData = [attributes.albumCover];
+      } else {
+        productImagesData = [];
+      }
+    } else if (formData.category === "Books") {
+      // Generate title from book attributes
+      const bookTitle = attributes.bookTitle || "";
+      const author = attributes.author || "";
+      productTitle = bookTitle || formData.title || "Untitled Book";
+      
+      // Generate description from book attributes
+      const isbn = attributes.isbn || "";
+      const publisher = attributes.publisher || "";
+      const publicationDate = attributes.publicationDate || "";
+      const format = attributes.format || "";
+      const parts = [];
+      if (author) parts.push(`Author: ${author}`);
+      if (isbn) parts.push(`ISBN: ${isbn}`);
+      if (publisher) parts.push(`Publisher: ${publisher}`);
+      if (publicationDate) parts.push(`Published: ${new Date(publicationDate).toLocaleDateString()}`);
+      if (format) parts.push(`Format: ${format}`);
+      productDescription = parts.length > 0 ? parts.join(" | ") : null;
+      
+      // Use book cover as the product image if available
+      if (attributes.bookCover) {
+        productImagesData = [attributes.bookCover];
+      } else {
+        productImagesData = [];
+      }
+    } else if (formData.category === "Courses") {
+      // Generate title from course attributes
+      const courseTitle = attributes.courseTitle || "";
+      const instructor = attributes.instructor || "";
+      productTitle = courseTitle || formData.title || "Untitled Course";
+      
+      // Generate description from course attributes
+      const level = attributes.level || "";
+      const duration = attributes.duration || "";
+      const language = attributes.language || "";
+      const parts = [];
+      if (instructor) parts.push(`Instructor: ${instructor}`);
+      if (level) parts.push(`Level: ${level}`);
+      if (duration) parts.push(`Duration: ${duration}`);
+      if (language) parts.push(`Language: ${language}`);
+      productDescription = parts.length > 0 ? parts.join(" | ") : null;
+      
+      // Use course thumbnail as the product image if available
+      if (attributes.thumbnail) {
+        productImagesData = [attributes.thumbnail];
       } else {
         productImagesData = [];
       }
@@ -337,8 +385,8 @@ export default function Products() {
                   </Select>
                 </div>
 
-                {/* Generic fields - hidden for Music category */}
-                {formData.category !== "Music" && (
+                {/* Generic fields - hidden for categories with specific field definitions */}
+                {!["Music", "Books", "Courses"].includes(formData.category) && (
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="title">Product Title</Label>
@@ -421,8 +469,8 @@ export default function Products() {
                   </div>
                 </div>
 
-                {/* Image Gallery - hidden for Music category */}
-                {user && formData.category !== "Music" && (
+                {/* Image Gallery - hidden for digital/downloadable categories */}
+                {user && !["Music", "Books", "Courses"].includes(formData.category) && (
                   <ImageGalleryUpload
                     images={productImages}
                     onChange={setProductImages}
