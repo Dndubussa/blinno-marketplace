@@ -42,7 +42,9 @@ export function ProductCard({ product, viewMode }: ProductCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const images = product.images && product.images.length > 0 ? product.images : ["/placeholder.svg"];
-  const isOutOfStock = product.stock_quantity === 0;
+  // Digital products don't have stock quantity (null)
+  const hasStock = product.stock_quantity !== null;
+  const isOutOfStock = hasStock && product.stock_quantity === 0;
   const { addToCart } = useCart();
   const { formatPrice } = useCurrency();
   const hasMultipleImages = images.length > 1;
