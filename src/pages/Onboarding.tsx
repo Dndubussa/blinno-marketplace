@@ -531,20 +531,34 @@ export default function Onboarding() {
       });
 
       if (error) {
-        throw new Error(error.message || "Failed to initiate checkout");
+        // Try to extract error message from error object
+        const errorMessage = error.message || error.error || "Failed to initiate checkout";
+        throw new Error(errorMessage);
       }
 
       if (!checkoutData?.success || !checkoutData?.data?.checkout_url) {
-        throw new Error(checkoutData?.error || "Failed to create checkout link");
+        const errorMessage = checkoutData?.error || checkoutData?.message || "Failed to create checkout link";
+        throw new Error(errorMessage);
       }
 
       // Redirect to Flutterwave checkout page
       window.location.href = checkoutData.data.checkout_url;
     } catch (error: any) {
       console.error("Subscription checkout error:", error);
+      
+      // Extract error message from various possible locations
+      let errorMessage = "Failed to initiate checkout. Please try again.";
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+      
       toast({
         title: "Checkout Error",
-        description: error.message || "Failed to initiate checkout. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       setIsProcessingPayment(false);
