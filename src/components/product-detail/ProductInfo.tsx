@@ -20,7 +20,7 @@ interface Product {
   currency?: string;
   category: string;
   subcategory: string | null;
-  stock_quantity: number;
+  stock_quantity: number | null;
   images?: string[] | null;
   seller_id: string;
   attributes?: any;

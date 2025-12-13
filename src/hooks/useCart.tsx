@@ -7,7 +7,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string | null;
-  stock_quantity: number;
+  stock_quantity: number | null;
   seller_id: string;
 }
 

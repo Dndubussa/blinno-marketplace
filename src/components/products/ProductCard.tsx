@@ -17,7 +17,7 @@ interface Product {
   currency?: string;
   category: string;
   images: string[] | null;
-  stock_quantity: number;
+  stock_quantity: number | null;
   seller_id: string;
 }
 
