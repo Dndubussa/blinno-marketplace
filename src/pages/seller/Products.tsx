@@ -130,16 +130,51 @@ export default function Products() {
 
     if (!user) return;
 
+    // For Music category, generate title from music-specific fields
+    let productTitle = formData.title;
+    let productDescription = formData.description || null;
+    let productImagesData = productImages;
+
+    if (formData.category === "Music") {
+      // Generate title from artist and music type
+      const artist = attributes.artist || "";
+      const musicType = attributes.musicType || "";
+      const musicTypeLabel = musicType === "single" ? "Single" : 
+                            musicType === "album" ? "Album" : 
+                            musicType === "ep" ? "EP" : 
+                            musicType === "beat" ? "Beat" : 
+                            musicType === "mixtape" ? "Mixtape" : "";
+      
+      productTitle = artist ? `${artist} - ${musicTypeLabel}` : musicTypeLabel;
+      
+      // Generate description from music attributes
+      const genre = attributes.genre || "";
+      const duration = attributes.duration || "";
+      const releaseDate = attributes.releaseDate || "";
+      const parts = [];
+      if (genre) parts.push(`Genre: ${genre}`);
+      if (duration) parts.push(`Duration: ${duration}`);
+      if (releaseDate) parts.push(`Released: ${new Date(releaseDate).toLocaleDateString()}`);
+      productDescription = parts.length > 0 ? parts.join(" | ") : null;
+      
+      // Use album cover as the product image if available
+      if (attributes.albumCover) {
+        productImagesData = [attributes.albumCover];
+      } else {
+        productImagesData = [];
+      }
+    }
+
     const productData = {
-      title: formData.title,
-      description: formData.description || null,
+      title: productTitle,
+      description: productDescription,
       price: parseFloat(formData.price),
       currency: formData.currency,
       category: formData.category,
       stock_quantity: parseInt(formData.stock_quantity) || 0,
       seller_id: user.id,
       attributes: attributes,
-      images: productImages,
+      images: productImagesData,
       is_active: true, // Explicitly set to active so products are immediately visible
     };
 
@@ -167,7 +202,7 @@ export default function Products() {
     } else {
       toast({
         title: editingProduct ? "Product updated" : "Product created",
-        description: `${formData.title} has been ${editingProduct ? "updated" : "added"} successfully.`,
+        description: `${productTitle} has been ${editingProduct ? "updated" : "added"} successfully.`,
       });
       setIsDialogOpen(false);
       setEditingProduct(null);
@@ -302,31 +337,36 @@ export default function Products() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="title">Product Title</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                    placeholder="Enter product title"
-                    required
-                  />
-                </div>
+                {/* Generic fields - hidden for Music category */}
+                {formData.category !== "Music" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Product Title</Label>
+                      <Input
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) =>
+                          setFormData({ ...formData, title: e.target.value })
+                        }
+                        placeholder="Enter product title"
+                        required
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    placeholder="Describe your product..."
-                    rows={3}
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) =>
+                          setFormData({ ...formData, description: e.target.value })
+                        }
+                        placeholder="Describe your product..."
+                        rows={3}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -381,8 +421,8 @@ export default function Products() {
                   </div>
                 </div>
 
-                {/* Image Gallery */}
-                {user && (
+                {/* Image Gallery - hidden for Music category */}
+                {user && formData.category !== "Music" && (
                   <ImageGalleryUpload
                     images={productImages}
                     onChange={setProductImages}
