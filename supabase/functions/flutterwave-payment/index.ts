@@ -173,6 +173,8 @@ async function initiateCheckout(payload: {
   const result = await response.json();
   console.log("Flutterwave checkout response:", JSON.stringify(result, null, 2));
 
+  // Flutterwave can return different response structures
+  // Check for both 'success' status and 'data.link' or 'data.link' directly
   if (result.status === "success" && result.data?.link) {
     return {
       success: true,
@@ -181,8 +183,19 @@ async function initiateCheckout(payload: {
       transaction_id: result.data.id || null,
       message: "Checkout link created successfully",
     };
+  } else if (result.data?.link) {
+    // Sometimes Flutterwave returns link without explicit success status
+    return {
+      success: true,
+      checkout_url: result.data.link,
+      reference: result.data.tx_ref || payload.reference,
+      transaction_id: result.data.id || null,
+      message: "Checkout link created successfully",
+    };
   } else {
-    throw new Error(result.message || "Checkout initiation failed");
+    // Log the full response for debugging
+    console.error("Flutterwave checkout failed. Full response:", JSON.stringify(result, null, 2));
+    throw new Error(result.message || result.data?.message || "Checkout initiation failed");
   }
 }
 
@@ -446,6 +459,15 @@ serve(async (req) => {
             );
           }
 
+          console.log("Initiating checkout with:", {
+            amount,
+            currency: payload.currency || "TZS",
+            reference: String(payload.reference).trim(),
+            customerEmail,
+            customerName,
+            redirect_url: String(payload.redirect_url).trim(),
+          });
+
           // Initiate checkout
           const result = await initiateCheckout({
             amount: amount,
@@ -459,6 +481,8 @@ serve(async (req) => {
             redirect_url: String(payload.redirect_url).trim(),
             meta: payload.meta || {},
           });
+
+          console.log("Checkout result:", JSON.stringify(result, null, 2));
 
           // Store the transaction in the database (non-blocking)
           try {
