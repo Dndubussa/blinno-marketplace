@@ -3,7 +3,6 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { sendSecurityAlert } from "@/lib/notifications";
-import { checkAppVersion, updateAppVersion, clearAppVersion } from "@/lib/appVersion";
 
 type AppRole = "admin" | "seller" | "buyer";
 
@@ -60,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const versionCheckDone = useRef(false); // Track if version check has been performed
 
   const fetchProfile = async (userId: string): Promise<void> => {
     // Skip if we already have profile for this user (prevent unnecessary refetches)
