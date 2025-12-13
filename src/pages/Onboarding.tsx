@@ -108,6 +108,18 @@ export default function Onboarding() {
     sellerType: null,
   });
 
+  // Redirect to auth if user is not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to continue with onboarding.",
+        variant: "default",
+      });
+      navigate("/auth", { state: { from: location.pathname } });
+    }
+  }, [user, loading, navigate, location.pathname, toast]);
+
   // If user already has roles but data.role is null, update it
   useEffect(() => {
     if (!data.role && userRoles && userRoles.length > 0) {
@@ -456,6 +468,17 @@ export default function Onboarding() {
     if (data.pricingModel !== "subscription") {
       // For percentage plans, just proceed to next step
       handleSellerNext();
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!user || !user.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to continue with your subscription.",
+        variant: "destructive",
+      });
+      navigate("/auth", { state: { from: location.pathname } });
       return;
     }
 

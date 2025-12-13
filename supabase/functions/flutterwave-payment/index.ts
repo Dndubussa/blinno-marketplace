@@ -271,9 +271,13 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      console.error("Invalid token or user not found:", userError);
+      console.error("Invalid token or user not found:", userError?.message || "User not found");
       return new Response(
-        JSON.stringify({ success: false, error: "Unauthorized" }),
+        JSON.stringify({ 
+          success: false, 
+          error: "Unauthorized",
+          message: userError?.message || "Please sign in to continue"
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
