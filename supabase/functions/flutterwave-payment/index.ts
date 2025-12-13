@@ -24,7 +24,8 @@ interface PaymentRequest {
 // Flutterwave API configuration
 // Trim any whitespace from the base URL to prevent URL encoding issues
 const FLUTTERWAVE_BASE_URL = (Deno.env.get("FLUTTERWAVE_BASE_URL") || "https://api.flutterwave.com/v3").trim();
-const FLUTTERWAVE_SECRET_KEY = Deno.env.get("FLUTTERWAVE_SECRET_KEY");
+// Trim secret key to remove any accidental whitespace
+const FLUTTERWAVE_SECRET_KEY = Deno.env.get("FLUTTERWAVE_SECRET_KEY")?.trim();
 
 // Map our network names to Flutterwave's network codes
 const NETWORK_MAP: Record<string, string> = {
