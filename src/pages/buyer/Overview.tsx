@@ -13,6 +13,13 @@ import {
   TrendingUp,
   ShoppingBag,
   ArrowRight,
+  Library,
+  FileText,
+  Music,
+  BookOpen,
+  GraduationCap,
+  CreditCard,
+  CheckCircle,
 } from "lucide-react";
 
 export default function BuyerOverview() {
@@ -45,10 +52,22 @@ export default function BuyerOverview() {
       if (error) throw error;
 
       const totalOrders = allOrders?.length || 0;
-      const pendingOrders = allOrders?.filter((o) => o.status === "pending").length || 0;
+      const pendingOrders = allOrders?.filter((o) => o.status === "pending" || o.status === "paid").length || 0;
+      const completedOrders = allOrders?.filter((o) => o.status === "delivered" || o.status === "completed").length || 0;
       const totalSpent = allOrders?.reduce((sum, o) => sum + Number(o.total_amount), 0) || 0;
 
-      return { totalOrders, pendingOrders, totalSpent };
+      // Get digital products count
+      const { data: digitalPurchases } = await supabase
+        .from("purchased_products")
+        .select("product_id, products!inner(category)")
+        .eq("user_id", user?.id);
+
+      const digitalCategories = ["Music", "Books", "Courses"];
+      const digitalProductsCount = digitalPurchases?.filter((p: any) => 
+        digitalCategories.includes(p.products?.category)
+      ).length || 0;
+
+      return { totalOrders, pendingOrders, completedOrders, totalSpent, digitalProductsCount };
     },
     enabled: !!user?.id,
   });
@@ -56,17 +75,20 @@ export default function BuyerOverview() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      case "paid":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       case "processing":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       case "shipped":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
       case "delivered":
-        return "bg-green-100 text-green-800";
+      case "completed":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "cancelled":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
     }
   };
 
@@ -91,7 +113,7 @@ export default function BuyerOverview() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -111,8 +133,8 @@ export default function BuyerOverview() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-yellow-100">
-                <Clock className="w-6 h-6 text-yellow-600" />
+              <div className="p-3 rounded-xl bg-yellow-100 dark:bg-yellow-900">
+                <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pending Orders</p>
@@ -127,8 +149,24 @@ export default function BuyerOverview() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-green-100">
-                <TrendingUp className="w-6 h-6 text-green-600" />
+              <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900">
+                <Library className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Digital Products</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {stats?.digitalProductsCount || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-green-100 dark:bg-green-900">
+                <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Spent</p>
@@ -174,9 +212,29 @@ export default function BuyerOverview() {
                         Order #{order.id.slice(0, 8)}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {order.order_items?.length || 0} items · $
+                        {order.order_items?.length || 0} item{order.order_items?.length !== 1 ? 's' : ''} · $
                         {Number(order.total_amount).toFixed(2)}
                       </p>
+                      {order.order_items && order.order_items.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {order.order_items.slice(0, 3).map((item: any, idx: number) => {
+                            const isDigital = ["Music", "Books", "Courses"].includes(item.products?.category);
+                            return (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {item.products?.category || "Unknown"}
+                                {isDigital && (
+                                  <span className="ml-1 text-purple-600 dark:text-purple-400">• Digital</span>
+                                )}
+                              </Badge>
+                            );
+                          })}
+                          {order.order_items.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{order.order_items.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -203,12 +261,29 @@ export default function BuyerOverview() {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="hover:shadow-md transition-shadow cursor-pointer">
-          <Link to="/wishlist">
+          <Link to="/buyer/library">
             <CardContent className="p-6 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-pink-100">
-                <Heart className="w-6 h-6 text-pink-600" />
+              <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900">
+                <Library className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Digital Library</h3>
+                <p className="text-sm text-muted-foreground">
+                  Access your digital purchases
+                </p>
+              </div>
+              <ArrowRight className="w-5 h-5 ml-auto text-muted-foreground" />
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          <Link to="/buyer/wishlist">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-pink-100 dark:bg-pink-900">
+                <Heart className="w-6 h-6 text-pink-600 dark:text-pink-400" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Your Wishlist</h3>
