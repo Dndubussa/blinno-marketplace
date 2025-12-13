@@ -284,7 +284,36 @@ serve(async (req) => {
 
     console.log(`Payment request from authenticated user: ${user.id}`);
 
-    const { action, ...payload } = await req.json();
+    // Parse request body with error handling
+    let action: string;
+    let payload: any;
+    try {
+      const body = await req.json();
+      action = body.action;
+      const { action: _, ...rest } = body;
+      payload = rest;
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid request body",
+          message: "Invalid request body. Please check your request format.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!action) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Missing action parameter",
+          message: "Missing action parameter. Please specify an action.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     console.log("Flutterwave payment action:", action);
     console.log("Payment payload received:", JSON.stringify(payload, null, 2));
@@ -472,21 +501,50 @@ serve(async (req) => {
             redirect_url: String(payload.redirect_url).trim(),
           });
 
-          // Initiate checkout
-          const result = await initiateCheckout({
-            amount: amount,
-            currency: payload.currency || "TZS",
-            reference: String(payload.reference).trim(),
-            description: payload.description || "Blinno Subscription",
-            customer: {
-              email: customerEmail,
-              name: customerName,
-            },
-            redirect_url: String(payload.redirect_url).trim(),
-            meta: payload.meta || {},
-          });
+          // Validate Flutterwave secret key before attempting checkout
+          if (!FLUTTERWAVE_SECRET_KEY) {
+            console.error("Flutterwave secret key not configured");
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: "Payment service not configured. Please contact support.",
+                message: "Payment service not configured. Please contact support.",
+              }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
 
-          console.log("Checkout result:", JSON.stringify(result, null, 2));
+          // Initiate checkout
+          let result;
+          try {
+            result = await initiateCheckout({
+              amount: amount,
+              currency: payload.currency || "TZS",
+              reference: String(payload.reference).trim(),
+              description: payload.description || "Blinno Subscription",
+              customer: {
+                email: customerEmail,
+                name: customerName,
+              },
+              redirect_url: String(payload.redirect_url).trim(),
+              meta: payload.meta || {},
+            });
+
+            console.log("Checkout result:", JSON.stringify(result, null, 2));
+          } catch (checkoutInitError: unknown) {
+            const errorMessage = checkoutInitError instanceof Error ? checkoutInitError.message : "Unknown checkout error";
+            console.error("Error initiating Flutterwave checkout:", errorMessage, checkoutInitError);
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: errorMessage,
+                message: errorMessage.includes("not configured") 
+                  ? "Payment service not configured. Please contact support."
+                  : `Failed to initiate checkout: ${errorMessage}`,
+              }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
 
           // Store the transaction in the database (non-blocking)
           try {
