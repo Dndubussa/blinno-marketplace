@@ -1,7 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+// Initialize Resend with API key, or null if not available
+const resendApiKey = Deno.env.get("RESEND_API_KEY");
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const getCorsHeaders = (origin?: string | null) => {
   const allowedOrigins = [
@@ -169,6 +171,26 @@ serve(async (req: Request): Promise<Response> => {
         </body>
       </html>
     `;
+
+    // Check if Resend is configured
+    if (!resend) {
+      console.warn("RESEND_API_KEY not configured. Skipping email send.");
+      // Return success but log that email was not sent
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          warning: "Email service not configured. Alert logged but email not sent.",
+          emailId: null 
+        }),
+        { 
+          status: 200, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json" 
+          } 
+        }
+      );
+    }
 
     const emailResponse = await resend.emails.send({
       from: "Blinno Security <security@blinno.app>",
