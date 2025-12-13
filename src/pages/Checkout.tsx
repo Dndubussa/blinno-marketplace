@@ -51,6 +51,7 @@ const shippingSchema = z.object({
 type ShippingFormData = z.infer<typeof shippingSchema>;
 
 type MobileNetwork = "MPESA" | "TIGOPESA" | "AIRTELMONEY" | "HALOPESA";
+type PaymentMethod = "mobile_money" | "hosted_checkout";
 
 const mobileNetworks: { id: MobileNetwork; name: string; color: string }[] = [
   { id: "MPESA", name: "M-Pesa", color: "bg-green-500" },
@@ -84,6 +85,7 @@ export default function Checkout() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [selectedNetwork, setSelectedNetwork] = useState<MobileNetwork>("MPESA");
   const [paymentPhone, setPaymentPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("hosted_checkout");
   const [paymentStep, setPaymentStep] = useState<"shipping" | "payment" | "processing">("shipping");
   const [shippingData, setShippingData] = useState<ShippingFormData | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
@@ -687,16 +689,18 @@ export default function Checkout() {
                       </p>
                     </div>
 
-                    {/* Instructions */}
-                    <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
-                      <h4 className="font-medium text-blue-700 mb-2">How it works:</h4>
-                      <ol className="text-sm text-blue-600 space-y-1 list-decimal list-inside">
-                        <li>Click "Pay Now" to initiate the payment</li>
-                        <li>You'll receive a USSD prompt on your phone</li>
-                        <li>Enter your {selectedNetwork} PIN to confirm</li>
-                        <li>Your order will be processed automatically</li>
-                      </ol>
-                    </div>
+                    {/* Mobile Money Instructions */}
+                    {paymentMethod === "mobile_money" && (
+                      <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
+                        <h4 className="font-medium text-blue-700 mb-2">How it works:</h4>
+                        <ol className="text-sm text-blue-600 space-y-1 list-decimal list-inside">
+                          <li>Click "Pay Now" to initiate the payment</li>
+                          <li>You'll receive a USSD prompt on your phone</li>
+                          <li>Enter your {selectedNetwork} PIN to confirm</li>
+                          <li>Your order will be processed automatically</li>
+                        </ol>
+                      </div>
+                    )}
 
                     <div className="flex gap-3">
                       <Button
@@ -711,7 +715,7 @@ export default function Checkout() {
                         onClick={processPayment}
                         size="lg"
                         className="flex-1"
-                        disabled={isProcessing || !paymentPhone}
+                        disabled={isProcessing || (paymentMethod === "mobile_money" && !paymentPhone)}
                       >
                         {isProcessing ? (
                           <>
