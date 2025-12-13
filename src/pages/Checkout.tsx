@@ -182,81 +182,125 @@ export default function Checkout() {
 
       if (itemsError) throw itemsError;
 
-      // Format phone number for Flutterwave (ensure it starts with 255)
-      let formattedPhone = paymentPhone.replace(/\D/g, "");
-      if (formattedPhone.startsWith("0")) {
-        formattedPhone = "255" + formattedPhone.substring(1);
-      } else if (!formattedPhone.startsWith("255")) {
-        formattedPhone = "255" + formattedPhone;
-      }
-
       // Generate payment reference
-      const reference = `ORDER-${order.id.substring(0, 8).toUpperCase()}`;
+      const reference = `ORDER-${order.id.substring(0, 8).toUpperCase()}-${Date.now()}`;
 
-      // Initiate Flutterwave payment
-      const { data: paymentResult, error: paymentError } = await supabase.functions.invoke(
-        "flutterwave-payment",
-        {
-          body: {
-            action: "initiate",
-            amount: orderTotalTZS,
-            currency: "TZS",
-            phone_number: formattedPhone,
-            network: selectedNetwork,
-            reference: reference,
-            description: `Blinno Order Payment - ${items.length} item(s)`,
-            order_id: order.id,
-            email: shippingData.email,
-            name: shippingData.fullName,
-          },
+      if (paymentMethod === "hosted_checkout") {
+        // Use Flutterwave Hosted Checkout (redirect to Flutterwave page)
+        const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke(
+          "flutterwave-payment",
+          {
+            body: {
+              action: "initiate-checkout",
+              amount: orderTotalTZS,
+              currency: "TZS",
+              reference: reference,
+              description: `Blinno Order Payment - ${items.length} item(s)`,
+              customer: {
+                email: shippingData.email,
+                name: shippingData.fullName,
+              },
+              redirect_url: `${window.location.origin}/checkout/payment-callback?reference=${reference}`,
+              meta: {
+                orderId: order.id,
+                userId: user.id,
+              },
+            },
+          }
+        );
+
+        if (checkoutError) {
+          console.error("Checkout initiation error:", checkoutError);
+          throw new Error(checkoutError.message || "Failed to initiate checkout. Please try again.");
         }
-      );
 
-      if (paymentError) {
-        console.error("Payment initiation error:", paymentError);
-        throw new Error("Failed to initiate payment. Please try again.");
+        if (!checkoutData?.success || !checkoutData?.data?.checkout_url) {
+          const errorMessage = checkoutData?.error || checkoutData?.message || "Failed to create checkout link";
+          throw new Error(errorMessage);
+        }
+
+        // Store order ID in localStorage for callback page
+        localStorage.setItem("checkout_order_id", order.id);
+        localStorage.setItem("checkout_reference", reference);
+
+        // Redirect to Flutterwave checkout page
+        window.location.href = checkoutData.data.checkout_url;
+        return; // Don't continue with the rest of the function
+      } else {
+        // Use Mobile Money (USSD push)
+        // Format phone number for Flutterwave (ensure it starts with 255)
+        let formattedPhone = paymentPhone.replace(/\D/g, "");
+        if (formattedPhone.startsWith("0")) {
+          formattedPhone = "255" + formattedPhone.substring(1);
+        } else if (!formattedPhone.startsWith("255")) {
+          formattedPhone = "255" + formattedPhone;
+        }
+
+        // Initiate Flutterwave mobile money payment
+        const { data: paymentResult, error: paymentError } = await supabase.functions.invoke(
+          "flutterwave-payment",
+          {
+            body: {
+              action: "initiate",
+              amount: orderTotalTZS,
+              currency: "TZS",
+              phone_number: formattedPhone,
+              network: selectedNetwork,
+              reference: reference,
+              description: `Blinno Order Payment - ${items.length} item(s)`,
+              order_id: order.id,
+              email: shippingData.email,
+              name: shippingData.fullName,
+            },
+          }
+        );
+
+        if (paymentError) {
+          console.error("Payment initiation error:", paymentError);
+          throw new Error("Failed to initiate payment. Please try again.");
+        }
+
+        if (!paymentResult?.success) {
+          throw new Error(paymentResult?.error || "Payment initiation failed");
+        }
+
+        // Store payment reference and transaction ID for status polling
+        setPaymentReference(reference);
+        
+        // Store transaction ID from Flutterwave response if available
+        const transactionId = paymentResult?.data?.transaction_id || paymentResult?.data?.reference || null;
+        if (transactionId) {
+          // Store in a ref or state for status checking
+          // The backend will look it up by reference, but we can also use transaction_id directly
+        }
+
+        // Show USSD push notification
+        toast.success(
+          `A USSD prompt has been sent to ${formattedPhone}. Please enter your PIN to complete the payment.`,
+          { duration: 10000 }
+        );
+
+        // Send order confirmation email
+        await supabase.functions.invoke("order-confirmation", {
+          body: {
+            orderId: order.id,
+            email: shippingData.email,
+            customerName: shippingData.fullName,
+            items: items.map((item) => ({
+              title: item.title,
+              quantity: item.quantity,
+              price: item.price,
+            })),
+            total: orderTotal,
+            shippingAddress: shippingData,
+          },
+        });
+
+        setOrderId(order.id);
+        setOrderComplete(true);
+        clearCart();
+        toast.success("Order placed successfully! Complete the payment on your phone.");
       }
-
-      if (!paymentResult?.success) {
-        throw new Error(paymentResult?.error || "Payment initiation failed");
-      }
-
-      // Store payment reference and transaction ID for status polling
-      setPaymentReference(reference);
-      
-      // Store transaction ID from Flutterwave response if available
-      const transactionId = paymentResult?.data?.transaction_id || paymentResult?.data?.reference || null;
-      if (transactionId) {
-        // Store in a ref or state for status checking
-        // The backend will look it up by reference, but we can also use transaction_id directly
-      }
-
-      // Show USSD push notification
-      toast.success(
-        `A USSD prompt has been sent to ${formattedPhone}. Please enter your PIN to complete the payment.`,
-        { duration: 10000 }
-      );
-
-      // Send order confirmation email
-      await supabase.functions.invoke("order-confirmation", {
-        body: {
-          orderId: order.id,
-          email: shippingData.email,
-          customerName: shippingData.fullName,
-          items: items.map((item) => ({
-            title: item.title,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          total: orderTotal,
-          shippingAddress: shippingData,
-        },
-      });
-
-      setOrderId(order.id);
-      setOrderComplete(true);
-      clearCart();
-      toast.success("Order placed successfully! Complete the payment on your phone.");
     } catch (error: any) {
       console.error("Checkout error:", error);
       toast.error(error.message || "Failed to place order");
