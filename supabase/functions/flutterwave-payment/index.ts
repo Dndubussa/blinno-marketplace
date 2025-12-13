@@ -287,14 +287,14 @@ async function checkPaymentStatus(transactionId: string) {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: {
-        ...corsHeaders,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
+      headers: corsHeaders,
     });
   }
 
