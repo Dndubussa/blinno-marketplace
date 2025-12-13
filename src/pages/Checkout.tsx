@@ -134,7 +134,8 @@ export default function Checkout() {
       return;
     }
 
-    if (!paymentPhone || paymentPhone.length < 10) {
+    // Validate phone number only for mobile money
+    if (paymentMethod === "mobile_money" && (!paymentPhone || paymentPhone.length < 10)) {
       toast.error("Please enter a valid phone number for payment");
       return;
     }
