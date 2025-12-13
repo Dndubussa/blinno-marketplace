@@ -236,8 +236,12 @@ export default function Products() {
       if (lessonsCount) parts.push(`Lessons: ${lessonsCount}`);
       productDescription = parts.length > 0 ? parts.join(" | ") : null;
       
-      // Courses don't have a thumbnail field, so keep generic images or use preview video thumbnail
-      // For now, keep productImagesData as is
+      // Use course thumbnail as the product image if available
+      if (attributes.thumbnail) {
+        productImagesData = [attributes.thumbnail];
+      } else {
+        productImagesData = [];
+      }
     }
 
     // Digital products don't need stock quantity

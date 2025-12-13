@@ -38,6 +38,132 @@ export default function CategoryFields({ category, attributes, onChange, userId 
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Image-specific validation for cover images
+    if (fieldName === 'albumCover' || fieldName === 'coverImage' || fieldName === 'thumbnail') {
+      // Validate it's an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload an image file (JPG, PNG, or WebP).",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file size (max 10MB for cover images)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Cover images must be less than 10MB. Please compress your image.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate image dimensions asynchronously
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        
+        const width = img.width;
+        const height = img.height;
+        const aspectRatio = width / height;
+        
+        // Specific requirements based on field type
+        let minWidth = 400;
+        let minHeight = 400;
+        let maxWidth = 5000;
+        let maxHeight = 5000;
+        let recommendedAspectRatio: number | null = null;
+        let recommendedDimensions = '';
+        let errorMessage = '';
+
+        if (fieldName === 'albumCover') {
+          // Music album cover: Square (1:1), min 1000x1000px, recommended 1000x1000px or higher
+          minWidth = 1000;
+          minHeight = 1000;
+          recommendedAspectRatio = 1;
+          recommendedDimensions = '1000x1000px or higher';
+          errorMessage = 'Album cover must be square (1:1 ratio) and at least 1000x1000px. Recommended: 1000x1000px or higher.';
+        } else if (fieldName === 'coverImage') {
+          // Book cover: 2:3 ratio (portrait), min 600x900px, recommended 1200x1800px
+          minWidth = 600;
+          minHeight = 900;
+          recommendedAspectRatio = 2/3; // 0.666...
+          recommendedDimensions = '1200x1800px (2:3 ratio)';
+          errorMessage = 'Book cover should be portrait orientation (2:3 ratio) and at least 600x900px. Recommended: 1200x1800px.';
+        } else if (fieldName === 'thumbnail') {
+          // Course thumbnail: 16:9 ratio (landscape), min 1280x720px, recommended 1920x1080px
+          minWidth = 1280;
+          minHeight = 720;
+          recommendedAspectRatio = 16/9; // 1.777...
+          recommendedDimensions = '1920x1080px (16:9 ratio)';
+          errorMessage = 'Course thumbnail should be landscape (16:9 ratio) and at least 1280x720px. Recommended: 1920x1080px.';
+        }
+
+        // Check dimensions
+        if (width < minWidth || height < minHeight) {
+          toast({
+            title: "Image too small",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Check aspect ratio (with 5% tolerance)
+        if (recommendedAspectRatio !== null) {
+          const tolerance = 0.05;
+          const currentRatio = aspectRatio;
+          const ratioDiff = Math.abs(currentRatio - recommendedAspectRatio);
+          
+          if (ratioDiff > tolerance) {
+            toast({
+              title: "Incorrect aspect ratio",
+              description: errorMessage,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+
+        // Check max dimensions
+        if (width > maxWidth || height > maxHeight) {
+          toast({
+            title: "Image too large",
+            description: `Image dimensions exceed maximum allowed (${maxWidth}x${maxHeight}px). Please resize your image.`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // All validations passed, proceed with upload
+        performFileUpload(file, fieldName).catch((error) => {
+          console.error("Upload error:", error);
+          toast({
+            title: "Upload failed",
+            description: "An error occurred while uploading the image.",
+            variant: "destructive",
+          });
+        });
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        toast({
+          title: "Invalid image",
+          description: "The selected file is not a valid image. Please try another file.",
+          variant: "destructive",
+        });
+      };
+
+      img.src = objectUrl;
+      return; // Exit early, upload will happen in img.onload
+    }
+
+    // Non-image file validation (ebooks, audio, video)
     // File size validation (100MB max for most files, 500MB for videos)
     const maxSize = fieldName.includes('video') || fieldName === 'videoFile' ? 500 * 1024 * 1024 : 100 * 1024 * 1024;
     if (file.size > maxSize) {
@@ -48,6 +174,12 @@ export default function CategoryFields({ category, attributes, onChange, userId 
       });
       return;
     }
+
+    // Proceed with upload for non-image files
+    await performFileUpload(file, fieldName);
+  };
+
+  const performFileUpload = async (file: File, fieldName: string) => {
 
     setUploading(true);
     
@@ -359,7 +491,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
               disabled={uploading}
             />
           )}
-          <p className="text-xs text-muted-foreground">Upload a high-quality cover image for your book</p>
+          <p className="text-xs text-muted-foreground">Upload book cover (required: portrait 2:3 ratio, minimum 600x900px, recommended: 1200x1800px)</p>
         </div>
 
         {/* E-Book File Upload - shown for all formats as optional, required for ebook */}
@@ -552,7 +684,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
               disabled={uploading}
             />
           )}
-          <p className="text-xs text-muted-foreground">Upload high-quality album cover art (recommended: 1000x1000px)</p>
+          <p className="text-xs text-muted-foreground">Upload high-quality album cover art (required: square 1:1 ratio, minimum 1000x1000px)</p>
         </div>
 
         {/* Audio File Upload */}
@@ -699,6 +831,32 @@ export default function CategoryFields({ category, attributes, onChange, userId 
           />
         </div>
 
+        {/* Course Thumbnail Image Upload */}
+        <div className="space-y-2">
+          <Label>Course Thumbnail Image *</Label>
+          {attributes.thumbnail ? (
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+              <img 
+                src={attributes.thumbnail} 
+                alt="Course thumbnail" 
+                className="h-20 w-36 object-cover rounded"
+              />
+              <span className="text-sm flex-1 truncate">Thumbnail uploaded</span>
+              <Button type="button" size="icon" variant="ghost" onClick={() => removeFile("thumbnail")}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFileUpload(e, "thumbnail")}
+              disabled={uploading}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">Upload course thumbnail (recommended: 1920x1080px, 16:9 ratio, landscape)</p>
+        </div>
+
         <div className="space-y-2">
           <Label>Course Preview Video</Label>
           {attributes.previewVideo ? (
@@ -717,6 +875,7 @@ export default function CategoryFields({ category, attributes, onChange, userId 
               disabled={uploading}
             />
           )}
+          <p className="text-xs text-muted-foreground">Optional: Upload a preview video for your course</p>
         </div>
       </div>
     );
