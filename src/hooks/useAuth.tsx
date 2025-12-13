@@ -188,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check app version FIRST - sign out if version changed (app was redeployed)
+    // Note: checkAppVersion() now updates the version internally if it changed
     const versionChanged = checkAppVersion();
     if (versionChanged) {
       console.log("App version changed - signing out all users");
@@ -203,11 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("blinno_intended_role");
       localStorage.removeItem("blinno_onboarding_tour_completed");
       localStorage.removeItem("blinno_seller_onboarding_tour_completed");
-      // Note: We don't clear the Supabase auth session from localStorage here
-      // as signOut() handles that, but we update the version AFTER clearing
-      
-      // Update to new version (this saves the new version to localStorage)
-      updateAppVersion();
+      // Note: checkAppVersion() already updated the version, so we don't need to call updateAppVersion() again
       
       // Show notification
       toast({
@@ -227,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Update app version if it matches (normal load - ensures version is stored)
+    // Only update if version hasn't changed (to avoid overwriting the update from checkAppVersion)
     updateAppVersion();
 
     let isInitialLoad = true;

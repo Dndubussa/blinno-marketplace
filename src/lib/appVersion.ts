@@ -15,13 +15,15 @@ const CURRENT_APP_VERSION = import.meta.env.VITE_APP_VERSION || `${Date.now()}`;
 /**
  * Check if app version has changed and invalidate session if needed
  * Returns true if version changed (user should be signed out)
+ * Also updates the stored version if it has changed (to prevent repeated checks)
  */
 export function checkAppVersion(): boolean {
   try {
     const storedVersion = localStorage.getItem(APP_VERSION_KEY);
     
-    // If no stored version, this is first load - don't sign out
+    // If no stored version, this is first load - store current version and don't sign out
     if (!storedVersion) {
+      updateAppVersion(); // Store current version
       return false; // First load - don't sign out
     }
     
@@ -31,6 +33,8 @@ export function checkAppVersion(): boolean {
         oldVersion: storedVersion,
         newVersion: CURRENT_APP_VERSION,
       });
+      // Update version immediately to prevent repeated checks
+      updateAppVersion();
       return true; // Version changed - sign out user
     }
     
