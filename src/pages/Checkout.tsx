@@ -144,12 +144,68 @@ export default function Checkout() {
     setPaymentStep("processing");
 
     try {
-      // Create the order first
+      // SECURITY FIX: Fetch actual product prices and stock from database
+      // This prevents price manipulation attacks
+      const productIds = items.map((item) => item.id);
+      const { data: products, error: productsError } = await supabase
+        .from("products")
+        .select("id, price, stock_quantity, is_active, seller_id, title")
+        .in("id", productIds);
+
+      if (productsError) {
+        throw new Error("Failed to validate products. Please try again.");
+      }
+
+      if (!products || products.length !== items.length) {
+        throw new Error("Some products are no longer available. Please refresh your cart.");
+      }
+
+      // Validate products are active and stock is available
+      const validatedItems = items.map((cartItem) => {
+        const product = products.find((p) => p.id === cartItem.id);
+        if (!product) {
+          throw new Error(`Product ${cartItem.title} is no longer available.`);
+        }
+
+        if (!product.is_active) {
+          throw new Error(`Product ${product.title} is no longer active.`);
+        }
+
+        // Validate stock quantity (null means unlimited for digital products)
+        if (product.stock_quantity !== null && product.stock_quantity < cartItem.quantity) {
+          throw new Error(
+            `Insufficient stock for ${product.title}. Available: ${product.stock_quantity}, Requested: ${cartItem.quantity}`
+          );
+        }
+
+        // Validate seller_id matches (prevent seller manipulation)
+        if (product.seller_id !== cartItem.seller_id) {
+          throw new Error(`Product ${product.title} seller mismatch. Please refresh your cart.`);
+        }
+
+        return {
+          ...cartItem,
+          validatedPrice: product.price, // Use database price, not client price
+          validatedSellerId: product.seller_id,
+        };
+      });
+
+      // Calculate total using validated prices
+      const validatedTotalPrice = validatedItems.reduce(
+        (sum, item) => sum + item.validatedPrice * item.quantity,
+        0
+      );
+      const validatedShippingCost = validatedTotalPrice >= 100 ? 0 : 9.99;
+      const validatedTax = validatedTotalPrice * 0.08;
+      const validatedOrderTotal = validatedTotalPrice + validatedShippingCost + validatedTax;
+      const validatedOrderTotalTZS = validatedOrderTotal * 2500;
+
+      // Create the order with server-validated total
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
           buyer_id: user.id,
-          total_amount: orderTotal,
+          total_amount: validatedOrderTotal, // Use validated total
           status: "pending",
           shipping_address: {
             fullName: shippingData.fullName,
@@ -167,13 +223,13 @@ export default function Checkout() {
 
       if (orderError) throw orderError;
 
-      // Create order items
-      const orderItems = items.map((item) => ({
+      // Create order items with validated prices
+      const orderItems = validatedItems.map((item) => ({
         order_id: order.id,
         product_id: item.id,
-        seller_id: item.seller_id,
+        seller_id: item.validatedSellerId, // Use validated seller_id
         quantity: item.quantity,
-        price_at_purchase: item.price,
+        price_at_purchase: item.validatedPrice, // Use database price, not client price
       }));
 
       const { error: itemsError } = await supabase
@@ -187,15 +243,16 @@ export default function Checkout() {
 
       if (paymentMethod === "hosted_checkout") {
         // Use Flutterwave Hosted Checkout (redirect to Flutterwave page)
+        // Use validated order total for payment
         const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke(
           "flutterwave-payment",
           {
             body: {
               action: "initiate-checkout",
-              amount: orderTotalTZS,
+              amount: validatedOrderTotalTZS, // Use validated total
               currency: "TZS",
               reference: reference,
-              description: `Blinno Order Payment - ${items.length} item(s)`,
+              description: `Blinno Order Payment - ${validatedItems.length} item(s)`,
               customer: {
                 email: shippingData.email,
                 name: shippingData.fullName,
@@ -237,17 +294,18 @@ export default function Checkout() {
         }
 
         // Initiate Flutterwave mobile money payment
+        // Use validated order total for payment
         const { data: paymentResult, error: paymentError } = await supabase.functions.invoke(
           "flutterwave-payment",
           {
             body: {
               action: "initiate",
-              amount: orderTotalTZS,
+              amount: validatedOrderTotalTZS, // Use validated total
               currency: "TZS",
               phone_number: formattedPhone,
               network: selectedNetwork,
               reference: reference,
-              description: `Blinno Order Payment - ${items.length} item(s)`,
+              description: `Blinno Order Payment - ${validatedItems.length} item(s)`,
               order_id: order.id,
               email: shippingData.email,
               name: shippingData.fullName,

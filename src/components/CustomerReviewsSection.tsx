@@ -177,13 +177,13 @@ export const CustomerReviewsSection = () => {
               {/* Review Title */}
               {review.title && (
                 <h3 className="font-semibold text-foreground mb-2">
-                  {review.title}
+                  {sanitizeText(review.title)}
                 </h3>
               )}
 
               {/* Review Content */}
               <p className="text-muted-foreground text-sm leading-relaxed mb-4 line-clamp-4">
-                {review.content}
+                {sanitizeText(review.content)}
               </p>
 
               {/* Product Link */}

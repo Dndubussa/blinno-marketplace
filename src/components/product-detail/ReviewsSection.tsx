@@ -256,10 +256,10 @@ export function ReviewsSection({ productId }: ReviewsSectionProps) {
               </div>
 
               {review.title && (
-                <h4 className="mt-4 font-semibold">{review.title}</h4>
+                <h4 className="mt-4 font-semibold">{sanitizeText(review.title)}</h4>
               )}
               {review.content && (
-                <p className="mt-2 text-muted-foreground">{review.content}</p>
+                <p className="mt-2 text-muted-foreground">{sanitizeText(review.content)}</p>
               )}
             </div>
           ))

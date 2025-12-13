@@ -40,19 +40,53 @@ interface FlutterwaveWebhook {
   };
 }
 
-// Verify Flutterwave webhook signature
-function verifySignature(payload: string, signature: string, secret: string): boolean {
+// Verify Flutterwave webhook signature using HMAC SHA256
+// Flutterwave sends the signature in the 'verifhash' header
+async function verifySignature(payload: string, signature: string, secret: string): Promise<boolean> {
   if (!secret) {
     console.warn("FLUTTERWAVE_WEBHOOK_SECRET not set - skipping signature verification");
-    return true; // Allow if secret not configured
+    return true; // Allow if secret not configured (for development)
   }
 
-  // Flutterwave uses SHA256 HMAC for webhook verification
-  // The signature is in the 'verifhash' header
+  if (!signature) {
+    console.error("Missing webhook signature");
+    return false;
+  }
+
   try {
-    // For now, we'll do basic verification
-    // In production, implement proper HMAC verification
-    return signature === secret || true; // Simplified for now
+    // Flutterwave uses HMAC SHA256 for webhook verification
+    // The signature is a hex-encoded HMAC SHA256 hash
+    const encoder = new TextEncoder();
+    const key = encoder.encode(secret);
+    const data = encoder.encode(payload);
+
+    // Import the secret key for HMAC
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      key,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+
+    // Generate HMAC signature
+    const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, data);
+    
+    // Convert to hex string
+    const hashArray = Array.from(new Uint8Array(signatureBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+
+    // Compare signatures (case-insensitive as Flutterwave may send uppercase)
+    const isValid = hashHex.toLowerCase() === signature.toLowerCase();
+    
+    if (!isValid) {
+      console.error("Signature mismatch:", {
+        expected: hashHex,
+        received: signature,
+      });
+    }
+
+    return isValid;
   } catch (error) {
     console.error("Signature verification error:", error);
     return false;
@@ -73,19 +107,30 @@ serve(async (req) => {
 
     // Verify webhook signature
     // Flutterwave sends the signature in the 'verifhash' header
-    const signature = req.headers.get("verifhash") || req.headers.get("x-flutterwave-signature");
-    if (webhookSecret && signature) {
+    const signature = req.headers.get("verifhash") || 
+                      req.headers.get("x-flutterwave-signature") ||
+                      req.headers.get("X-Flutterwave-Signature");
+    
+    if (webhookSecret) {
+      if (!signature) {
+        console.error("Webhook secret configured but no signature provided");
+        return new Response(
+          JSON.stringify({ success: false, error: "Missing signature" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const isValid = await verifySignature(rawBody, signature, webhookSecret);
       if (!isValid) {
-        console.error("Invalid webhook signature");
+        console.error("Invalid webhook signature - potential security threat");
         return new Response(
           JSON.stringify({ success: false, error: "Invalid signature" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       console.log("Webhook signature verified successfully");
-    } else if (webhookSecret && !signature) {
-      console.warn("Webhook secret configured but no signature provided - this may be a test request");
+    } else {
+      console.warn("FLUTTERWAVE_WEBHOOK_SECRET not configured - webhook signature verification disabled");
     }
 
     // Validate required fields
