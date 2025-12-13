@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -126,15 +126,26 @@ export default function SellerDashboard() {
 
   // Redirect to onboarding if needed
   // This respects the persistent onboarding_completed flag
+  // Use refs to prevent unnecessary re-runs on tab switch
+  const hasCheckedOnboardingRef = useRef(false);
   useEffect(() => {
-    if (!loading && !onboardingLoading && user && hasRole("seller")) {
+    // Only check once when conditions are met, not on every render
+    if (!loading && !onboardingLoading && user && hasRole("seller") && !hasCheckedOnboardingRef.current) {
       // Only redirect if onboarding is truly incomplete
       // If onboarding_completed flag is true and version is current, never redirect
       if (shouldShowOnboarding && onboardingStatus && !onboardingStatus.isComplete) {
+        hasCheckedOnboardingRef.current = true;
         navigate("/onboarding", { replace: true });
+      } else if (onboardingStatus?.isComplete) {
+        // Mark as checked if onboarding is complete
+        hasCheckedOnboardingRef.current = true;
       }
     }
-  }, [loading, onboardingLoading, user, hasRole, shouldShowOnboarding, onboardingStatus, navigate]);
+    
+    // Reset check flag if user changes
+    if (!user) {
+      hasCheckedOnboardingRef.current = false;
+  }, [loading, onboardingLoading, user?.id, hasRole, shouldShowOnboarding, onboardingStatus?.isComplete, navigate]);
 
   if (loading || onboardingLoading) {
     return (

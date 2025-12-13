@@ -2,7 +2,7 @@
  * Hook to check and manage onboarding status
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./useAuth";
 import {
   checkOnboardingStatus,
@@ -16,18 +16,20 @@ export function useOnboardingStatus() {
   const { user } = useAuth();
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastUserIdRef = useRef<string | null>(null);
+  const isInitialLoadRef = useRef(true);
 
-  useEffect(() => {
-    if (user) {
-      loadStatus();
-    } else {
-      setStatus(null);
-      setLoading(false);
-    }
-  }, [user]);
-
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     if (!user) return;
+
+    // Prevent refetching if we already have status for this user
+    // Only refetch if user changed or on initial load
+    if (lastUserIdRef.current === user.id && !isInitialLoadRef.current) {
+      return;
+    }
+
+    lastUserIdRef.current = user.id;
+    isInitialLoadRef.current = false;
 
     setLoading(true);
     try {
@@ -38,7 +40,21 @@ export function useOnboardingStatus() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      // Only load if user changed or on initial load
+      if (lastUserIdRef.current !== user.id || isInitialLoadRef.current) {
+        loadStatus();
+      }
+    } else {
+      setStatus(null);
+      setLoading(false);
+      lastUserIdRef.current = null;
+      isInitialLoadRef.current = true;
+    }
+  }, [user?.id, loadStatus]);
 
   const completeStep = async (stepId: string, stepData?: Record<string, any>) => {
     if (!user) return false;
