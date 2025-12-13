@@ -127,6 +127,40 @@ export default function Orders() {
     };
 
     fetchOrders();
+
+    // Set up real-time subscription for orders
+    const channel = supabase
+      .channel("orders-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_items",
+          filter: `seller_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Order change detected:", payload);
+          fetchOrders();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        (payload) => {
+          console.log("Order status change detected:", payload);
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const handleStatusChange = async (orderId: string, newStatus: string, buyerId: string) => {

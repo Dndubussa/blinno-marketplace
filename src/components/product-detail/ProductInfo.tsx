@@ -55,8 +55,10 @@ export function ProductInfo({ product }: ProductInfoProps) {
   const { user } = useAuth();
   const { formatPrice } = useCurrency();
   
-  const isOutOfStock = product.stock_quantity === 0;
-  const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 5;
+  // Digital products don't have stock quantity
+  const hasStock = product.stock_quantity !== null;
+  const isOutOfStock = hasStock && product.stock_quantity === 0;
+  const isLowStock = hasStock && product.stock_quantity > 0 && product.stock_quantity <= 5;
   const isWishlisted = isInWishlist(product.id);
   const isDigital = isDigitalProduct(product.category);
   const isPurchased = hasPurchased(product.id);

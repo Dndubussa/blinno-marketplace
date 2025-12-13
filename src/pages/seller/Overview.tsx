@@ -176,6 +176,41 @@ export default function Overview() {
     };
 
     fetchStats();
+
+    // Set up real-time subscription for overview updates
+    const channel = supabase
+      .channel("overview-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_items",
+          filter: `seller_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Overview update detected:", payload);
+          fetchStats();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "products",
+          filter: `seller_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Product change detected for overview:", payload);
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   return (

@@ -122,7 +122,31 @@ export default function Products() {
   };
 
   useEffect(() => {
+    if (!user) return;
+    
     fetchProducts();
+
+    // Set up real-time subscription for products
+    const channel = supabase
+      .channel("products-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "products",
+          filter: `seller_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Product change detected:", payload);
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -209,13 +233,16 @@ export default function Products() {
       // For now, keep productImagesData as is
     }
 
+    // Digital products don't need stock quantity
+    const isDigitalProduct = ["Music", "Books", "Courses"].includes(formData.category);
+    
     const productData = {
       title: productTitle,
       description: productDescription,
       price: parseFloat(formData.price),
       currency: formData.currency,
       category: formData.category,
-      stock_quantity: parseInt(formData.stock_quantity) || 0,
+      stock_quantity: isDigitalProduct ? null : (parseInt(formData.stock_quantity) || 0),
       seller_id: user.id,
       attributes: attributes,
       images: productImagesData,
@@ -449,20 +476,23 @@ export default function Products() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="stock">Stock Quantity</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      min="0"
-                      value={formData.stock_quantity}
-                      onChange={(e) =>
-                        setFormData({ ...formData, stock_quantity: e.target.value })
-                      }
-                      placeholder="0"
-                      required
-                    />
-                  </div>
+                  {/* Stock Quantity - hidden for digital products */}
+                  {!["Music", "Books", "Courses"].includes(formData.category) && (
+                    <div className="space-y-2">
+                      <Label htmlFor="stock">Stock Quantity</Label>
+                      <Input
+                        id="stock"
+                        type="number"
+                        min="0"
+                        value={formData.stock_quantity}
+                        onChange={(e) =>
+                          setFormData({ ...formData, stock_quantity: e.target.value })
+                        }
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Image Gallery - hidden for digital/downloadable categories */}

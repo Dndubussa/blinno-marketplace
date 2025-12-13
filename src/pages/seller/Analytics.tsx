@@ -206,6 +206,41 @@ export default function Analytics() {
     };
 
     fetchStats();
+
+    // Set up real-time subscription for analytics updates
+    const channel = supabase
+      .channel("analytics-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_items",
+          filter: `seller_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Analytics update detected:", payload);
+          fetchStats();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "products",
+          filter: `seller_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Product change detected for analytics:", payload);
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   return (
