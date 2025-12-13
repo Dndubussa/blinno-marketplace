@@ -129,6 +129,9 @@ export default function Orders() {
     fetchOrders();
 
     // Set up real-time subscription for orders
+    // Use a ref to track if we're already fetching to prevent loops
+    let isFetching = false;
+    
     const channel = supabase
       .channel("orders-changes")
       .on(
@@ -139,9 +142,13 @@ export default function Orders() {
           table: "order_items",
           filter: `seller_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Order change detected:", payload);
-          fetchOrders();
+        () => {
+          if (!isFetching) {
+            isFetching = true;
+            fetchOrders().finally(() => {
+              isFetching = false;
+            });
+          }
         }
       )
       .on(
@@ -151,9 +158,13 @@ export default function Orders() {
           schema: "public",
           table: "orders",
         },
-        (payload) => {
-          console.log("Order status change detected:", payload);
-          fetchOrders();
+        () => {
+          if (!isFetching) {
+            isFetching = true;
+            fetchOrders().finally(() => {
+              isFetching = false;
+            });
+          }
         }
       )
       .subscribe();

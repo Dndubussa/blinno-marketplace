@@ -48,6 +48,9 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onError={() => handleImageError(selectedIndex)}
+            loading="eager"
+            width={800}
+            height={800}
           />
         </AnimatePresence>
 

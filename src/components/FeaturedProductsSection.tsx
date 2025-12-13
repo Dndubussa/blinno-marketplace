@@ -180,6 +180,9 @@ export const FeaturedProductsSection = () => {
                         onError={(e) => {
                           e.currentTarget.src = "/placeholder.svg";
                         }}
+                        loading="lazy"
+                        width={400}
+                        height={400}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground">

@@ -178,6 +178,9 @@ export default function Overview() {
     fetchStats();
 
     // Set up real-time subscription for overview updates
+    // Use a ref to track if we're already fetching to prevent loops
+    let isFetching = false;
+    
     const channel = supabase
       .channel("overview-changes")
       .on(
@@ -188,9 +191,13 @@ export default function Overview() {
           table: "order_items",
           filter: `seller_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Overview update detected:", payload);
-          fetchStats();
+        () => {
+          if (!isFetching) {
+            isFetching = true;
+            fetchStats().finally(() => {
+              isFetching = false;
+            });
+          }
         }
       )
       .on(
@@ -201,9 +208,13 @@ export default function Overview() {
           table: "products",
           filter: `seller_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Product change detected for overview:", payload);
-          fetchStats();
+        () => {
+          if (!isFetching) {
+            isFetching = true;
+            fetchStats().finally(() => {
+              isFetching = false;
+            });
+          }
         }
       )
       .subscribe();

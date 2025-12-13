@@ -55,7 +55,7 @@ export default function Analytics() {
   useEffect(() => {
     if (!user) return;
 
-    const fetchStats = async () => {
+    const fetchStats = async (): Promise<void> => {
       setLoading(true);
       
       // Calculate date ranges
@@ -208,6 +208,9 @@ export default function Analytics() {
     fetchStats();
 
     // Set up real-time subscription for analytics updates
+    // Use a ref to track if we're already fetching to prevent loops
+    let isFetching = false;
+    
     const channel = supabase
       .channel("analytics-changes")
       .on(
@@ -218,9 +221,13 @@ export default function Analytics() {
           table: "order_items",
           filter: `seller_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Analytics update detected:", payload);
-          fetchStats();
+        () => {
+          if (!isFetching) {
+            isFetching = true;
+            fetchStats().finally(() => {
+              isFetching = false;
+            });
+          }
         }
       )
       .on(
@@ -231,9 +238,13 @@ export default function Analytics() {
           table: "products",
           filter: `seller_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Product change detected for analytics:", payload);
-          fetchStats();
+        () => {
+          if (!isFetching) {
+            isFetching = true;
+            fetchStats().finally(() => {
+              isFetching = false;
+            });
+          }
         }
       )
       .subscribe();

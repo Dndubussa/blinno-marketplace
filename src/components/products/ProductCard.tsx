@@ -93,13 +93,16 @@ export function ProductCard({ product, viewMode }: ProductCardProps) {
         className="group flex gap-4 rounded-xl border border-border bg-white p-4 transition-all hover:shadow-lg"
       >
         {/* Image with navigation */}
-        <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-lg">
+        <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-lg bg-muted">
           <Link to={`/product/${product.id}`}>
             <img
               src={getImageSrc(currentImageIndex)}
               alt={product.title}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               onError={() => handleImageError(currentImageIndex)}
+              loading="lazy"
+              width={128}
+              height={128}
             />
           </Link>
           {isOutOfStock && (

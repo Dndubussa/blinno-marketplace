@@ -127,6 +127,9 @@ export default function Products() {
     fetchProducts();
 
     // Set up real-time subscription for products
+    // Use a ref to track if we're already fetching to prevent loops
+    let isFetching = false;
+    
     const channel = supabase
       .channel("products-changes")
       .on(
@@ -137,9 +140,13 @@ export default function Products() {
           table: "products",
           filter: `seller_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Product change detected:", payload);
-          fetchProducts();
+        () => {
+          if (!isFetching) {
+            isFetching = true;
+            fetchProducts().finally(() => {
+              isFetching = false;
+            });
+          }
         }
       )
       .subscribe();

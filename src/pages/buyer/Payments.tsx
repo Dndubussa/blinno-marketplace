@@ -119,7 +119,19 @@ export default function BuyerPayments() {
         },
         (payload) => {
           console.log("Payment update:", payload);
-          fetchTransactions();
+          // Refetch transactions without causing loop
+          setIsLoading(true);
+          supabase
+            .from("payment_transactions")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .then(({ data, error }) => {
+              if (!error && data) {
+                setTransactions(data);
+              }
+              setIsLoading(false);
+            });
         }
       )
       .subscribe();
@@ -127,7 +139,7 @@ export default function BuyerPayments() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchTransactions]);
+  }, [user]);
 
   const handleTestPayment = async () => {
     if (!newMethod.network || !newMethod.phone) {

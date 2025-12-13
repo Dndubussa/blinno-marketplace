@@ -163,10 +163,10 @@ export default function ProductsPage() {
                 >
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="rounded-xl border border-border bg-card p-4">
-                      <Skeleton className="aspect-square w-full rounded-lg" />
-                      <Skeleton className="mt-4 h-5 w-3/4" />
-                      <Skeleton className="mt-2 h-4 w-1/2" />
-                      <Skeleton className="mt-4 h-6 w-1/4" />
+                      <Skeleton className="aspect-square w-full rounded-lg bg-muted" />
+                      <Skeleton className="mt-4 h-5 w-3/4 bg-muted" />
+                      <Skeleton className="mt-2 h-4 w-1/2 bg-muted" />
+                      <Skeleton className="mt-4 h-6 w-1/4 bg-muted" />
                     </div>
                   ))}
                 </div>

@@ -459,10 +459,12 @@ export default function SearchPage() {
             {isLoading ? (
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {[...Array(6)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-80 animate-pulse rounded-xl bg-muted"
-                  />
+                  <div key={i} className="rounded-xl border border-border bg-card p-4">
+                    <Skeleton className="aspect-square w-full rounded-lg bg-muted" />
+                    <Skeleton className="mt-4 h-5 w-3/4 bg-muted" />
+                    <Skeleton className="mt-2 h-4 w-1/2 bg-muted" />
+                    <Skeleton className="mt-4 h-6 w-1/4 bg-muted" />
+                  </div>
                 ))}
               </div>
             ) : filteredProducts.length === 0 ? (
