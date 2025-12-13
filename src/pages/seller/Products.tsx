@@ -57,7 +57,7 @@ interface Product {
   price: number;
   currency?: string;
   category: string;
-  stock_quantity: number;
+  stock_quantity: number | null;
   is_active: boolean;
   created_at: string;
   attributes?: Record<string, any> | null;
@@ -300,13 +300,14 @@ export default function Products() {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
+    const isDigital = ["Music", "Books", "Courses"].includes(product.category);
     setFormData({
       title: product.title,
       description: product.description || "",
       price: product.price.toString(),
       currency: (product.currency || "USD") as Currency,
       category: product.category,
-      stock_quantity: product.stock_quantity.toString(),
+      stock_quantity: isDigital ? "" : (product.stock_quantity?.toString() || ""),
     });
     setAttributes(product.attributes || {});
     setProductImages(product.images || []);
@@ -563,6 +564,7 @@ export default function Products() {
             <TableRow>
               <TableHead>Product</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Stock</TableHead>
               <TableHead>Status</TableHead>
@@ -588,17 +590,55 @@ export default function Products() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredProducts.map((product) => (
+              filteredProducts.map((product) => {
+                const isDigital = ["Music", "Books", "Courses"].includes(product.category);
+                const hasStock = product.stock_quantity !== null;
+                return (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.title}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell>${product.price.toFixed(2)}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex flex-col">
+                      <span>{product.title}</span>
+                      {product.description && (
+                        <span className="text-xs text-muted-foreground line-clamp-1">
+                          {product.description}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={product.stock_quantity > 10 ? "default" : "destructive"}
-                    >
-                      {product.stock_quantity} in stock
-                    </Badge>
+                    <Badge variant="outline">{product.category}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {isDigital ? (
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                        Digital
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                        Physical
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {product.currency === "TZS" 
+                      ? `TZS ${(product.price * 2500).toLocaleString()}`
+                      : `$${product.price.toFixed(2)}`
+                    }
+                  </TableCell>
+                  <TableCell>
+                    {isDigital ? (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        N/A
+                      </Badge>
+                    ) : hasStock ? (
+                      <Badge
+                        variant={product.stock_quantity! > 10 ? "default" : product.stock_quantity! > 0 ? "secondary" : "destructive"}
+                      >
+                        {product.stock_quantity} in stock
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive">Out of Stock</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={product.is_active ? "default" : "secondary"}>

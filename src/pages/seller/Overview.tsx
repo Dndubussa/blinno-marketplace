@@ -7,10 +7,19 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
+  Music,
+  BookOpen,
+  GraduationCap,
+  FileText,
+  Link as LinkIcon,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import {
   AreaChart,
   Area,
@@ -26,6 +35,10 @@ interface Stats {
   totalOrders: number;
   totalRevenue: number;
   averageOrderValue: number;
+  digitalProducts: number;
+  physicalProducts: number;
+  activeProducts: number;
+  inactiveProducts: number;
 }
 
 const statCards = [
@@ -62,15 +75,26 @@ export default function Overview() {
     totalOrders: 0,
     totalRevenue: 0,
     averageOrderValue: 0,
+    digitalProducts: 0,
+    physicalProducts: 0,
+    activeProducts: 0,
+    inactiveProducts: 0,
   });
   const [revenueData, setRevenueData] = useState<Array<{ name: string; revenue: number }>>([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState<Array<{ category: string; count: number }>>([]);
+  const [recentProducts, setRecentProducts] = useState<Array<{ id: string; title: string; category: string; is_active: boolean; stock_quantity: number | null }>>([]);
   const [previousStats, setPreviousStats] = useState<Stats>({
     totalProducts: 0,
     totalOrders: 0,
     totalRevenue: 0,
     averageOrderValue: 0,
+    digitalProducts: 0,
+    physicalProducts: 0,
+    activeProducts: 0,
+    inactiveProducts: 0,
   });
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
@@ -84,11 +108,12 @@ export default function Overview() {
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
-      // Fetch products count
-      const { count: productsCount } = await supabase
+      // Fetch products with details
+      const { data: products, count: productsCount } = await supabase
         .from("products")
-        .select("*", { count: "exact", head: true })
-        .eq("seller_id", user.id);
+        .select("id, title, category, is_active, stock_quantity, created_at", { count: "exact" })
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false });
 
       // Fetch order items with order dates
       const { data: orderItems } = await supabase
@@ -135,11 +160,46 @@ export default function Overview() {
         .eq("seller_id", user.id)
         .lte("created_at", lastMonthEnd.toISOString());
 
+      // Calculate product type breakdown
+      const digitalCategories = ["Music", "Books", "Courses"];
+      const digitalProducts = products?.filter(p => digitalCategories.includes(p.category)).length || 0;
+      const physicalProducts = (productsCount || 0) - digitalProducts;
+      const activeProducts = products?.filter(p => p.is_active).length || 0;
+      const inactiveProducts = (productsCount || 0) - activeProducts;
+
+      // Calculate category breakdown
+      const categoryCounts: Record<string, number> = {};
+      products?.forEach(product => {
+        categoryCounts[product.category] = (categoryCounts[product.category] || 0) + 1;
+      });
+      const categoryBreakdownArray = Object.entries(categoryCounts)
+        .map(([category, count]) => ({ category, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      // Get recent products (last 5)
+      const recentProductsArray = (products || [])
+        .slice(0, 5)
+        .map(p => ({
+          id: p.id,
+          title: p.title,
+          category: p.category,
+          is_active: p.is_active,
+          stock_quantity: p.stock_quantity,
+        }));
+
+      setCategoryBreakdown(categoryBreakdownArray);
+      setRecentProducts(recentProductsArray);
+
       setPreviousStats({
         totalProducts: previousProductsCount || 0,
         totalOrders: previousMonthOrders,
         totalRevenue: previousMonthRevenue,
         averageOrderValue: previousMonthAvgOrder,
+        digitalProducts: 0, // Previous month breakdown not needed
+        physicalProducts: 0,
+        activeProducts: 0,
+        inactiveProducts: 0,
       });
 
       setStats({
@@ -147,6 +207,10 @@ export default function Overview() {
         totalOrders,
         totalRevenue,
         averageOrderValue,
+        digitalProducts,
+        physicalProducts,
+        activeProducts,
+        inactiveProducts,
       });
 
       // Generate monthly revenue data
@@ -293,6 +357,281 @@ export default function Overview() {
           </motion.div>
         ))}
       </div>
+
+      {/* Additional Stats - Product Types */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Digital Products
+              </CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? (
+                  <div className="h-8 w-20 animate-pulse bg-muted rounded" />
+                ) : (
+                  stats.digitalProducts
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Music, Books, Courses
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Physical Products
+              </CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? (
+                  <div className="h-8 w-20 animate-pulse bg-muted rounded" />
+                ) : (
+                  stats.physicalProducts
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Requires shipping
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Active Products
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? (
+                  <div className="h-8 w-20 animate-pulse bg-muted rounded" />
+                ) : (
+                  stats.activeProducts
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Visible to buyers
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Inactive Products
+              </CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? (
+                  <div className="h-8 w-20 animate-pulse bg-muted rounded" />
+                ) : (
+                  stats.inactiveProducts
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Hidden from marketplace
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Quick Actions & Recent Products */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => navigate("/seller/products")}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Product
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => navigate("/seller/orders")}
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                View Orders
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => navigate("/seller/analytics")}
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                View Analytics
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Category Breakdown */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Categories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-8 animate-pulse bg-muted rounded" />
+                  ))}
+                </div>
+              ) : categoryBreakdown.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No products yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {categoryBreakdown.map((item, index) => {
+                    const getCategoryIcon = (cat: string) => {
+                      if (cat === "Music") return <Music className="h-4 w-4" />;
+                      if (cat === "Books") return <BookOpen className="h-4 w-4" />;
+                      if (cat === "Courses") return <GraduationCap className="h-4 w-4" />;
+                      return <Package className="h-4 w-4" />;
+                    };
+                    return (
+                      <div key={item.category} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {getCategoryIcon(item.category)}
+                          <span className="text-sm font-medium">{item.category}</span>
+                        </div>
+                        <Badge variant="secondary">{item.count}</Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Recent Products */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.8 }}
+      >
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Products</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/seller/products")}
+            >
+              View All
+              <LinkIcon className="ml-2 h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-12 animate-pulse bg-muted rounded" />
+                ))}
+              </div>
+            ) : recentProducts.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">No products yet</p>
+                <Button onClick={() => navigate("/seller/products")}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Your First Product
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {recentProducts.map((product) => {
+                  const isDigital = ["Music", "Books", "Courses"].includes(product.category);
+                  return (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => navigate("/seller/products")}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{product.title}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {product.category}
+                          </Badge>
+                          {isDigital && (
+                            <Badge variant="secondary" className="text-xs">
+                              Digital
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          {product.is_active ? (
+                            <Badge variant="default" className="text-xs">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                          )}
+                          {!isDigital && product.stock_quantity !== null && (
+                            <span className="text-xs text-muted-foreground">
+                              {product.stock_quantity} in stock
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Revenue Chart */}
       <motion.div
