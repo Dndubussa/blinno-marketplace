@@ -22,7 +22,8 @@ interface PaymentRequest {
 }
 
 // Flutterwave API configuration
-const FLUTTERWAVE_BASE_URL = Deno.env.get("FLUTTERWAVE_BASE_URL") || "https://api.flutterwave.com/v3";
+// Trim any whitespace from the base URL to prevent URL encoding issues
+const FLUTTERWAVE_BASE_URL = (Deno.env.get("FLUTTERWAVE_BASE_URL") || "https://api.flutterwave.com/v3").trim();
 const FLUTTERWAVE_SECRET_KEY = Deno.env.get("FLUTTERWAVE_SECRET_KEY");
 
 // Map our network names to Flutterwave's network codes
@@ -79,7 +80,13 @@ async function initiatePayment(payload: PaymentRequest) {
 
   console.log("Flutterwave charge payload:", JSON.stringify(chargePayload, null, 2));
 
-  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/charges?type=mobile_money_tanzania`, {
+  // Ensure the URL is properly constructed (remove trailing slashes and spaces)
+  const baseUrl = FLUTTERWAVE_BASE_URL.replace(/\/+$/, "").trim(); // Remove trailing slashes and spaces
+  const chargesUrl = `${baseUrl}/charges?type=mobile_money_tanzania`;
+  
+  console.log("Flutterwave API URL:", chargesUrl);
+
+  const response = await fetch(chargesUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -155,7 +162,13 @@ async function initiateCheckout(payload: {
 
   console.log("Flutterwave checkout payload:", JSON.stringify(checkoutPayload, null, 2));
 
-  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/payments`, {
+  // Ensure the URL is properly constructed (remove trailing slashes and spaces)
+  const baseUrl = FLUTTERWAVE_BASE_URL.replace(/\/+$/, "").trim(); // Remove trailing slashes and spaces
+  const paymentsUrl = `${baseUrl}/payments`;
+  
+  console.log("Flutterwave API URL:", paymentsUrl);
+
+  const response = await fetch(paymentsUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -209,7 +222,13 @@ async function checkPaymentStatus(transactionId: string) {
     throw new Error("Flutterwave secret key not configured");
   }
 
-  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/transactions/${transactionId}/verify`, {
+  // Ensure the URL is properly constructed (remove trailing slashes and spaces)
+  const baseUrl = FLUTTERWAVE_BASE_URL.replace(/\/+$/, "").trim(); // Remove trailing slashes and spaces
+  const verifyUrl = `${baseUrl}/transactions/${transactionId}/verify`;
+  
+  console.log("Flutterwave verify URL:", verifyUrl);
+
+  const response = await fetch(verifyUrl, {
     method: "GET",
     headers: {
       "Authorization": `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
